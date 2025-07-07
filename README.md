@@ -1,6 +1,6 @@
-# Neon Space Invaders
+# Neon Invaders
 
-A modern, neon-themed implementation of the classic Space Invaders game with improved mechanics and proper code structure.
+A modern, neon-themed implementation of the classic Space Invaders game with improved mechanics, Tetris-inspired power-ups, and enhanced ship graphics.
 
 ## Features
 
@@ -10,13 +10,19 @@ A modern, neon-themed implementation of the classic Space Invaders game with imp
 - **Progressive Difficulty**: Each wave increases enemy movement speed
 - **Lives System**: Player has 3 lives
 - **Enemy Shooting**: Bottom row enemies can shoot back at the player
-- **Bonus System**: Tetris-themed bonuses drop randomly when enemies are destroyed
+- **Bonus System**: Tetris-themed bonuses with unique power-ups:
+  - **O-block (Cyan)**: Extra life
+  - **T-block (Yellow)**: Freeze enemies for 5 seconds
+  - **I-block (Purple)**: Triple shot in triangular pattern
+  - **S-block (Pink)**: Temporary shield
+  - **Z-block (Green)**: Rapid fire for 5 seconds
 - **Wave System**: Complete waves to progress with increasing difficulty
 - **High Score Tracking**: Persistent high score storage
 
 ### Visual Features
 
 - **Neon Color Scheme**: Vibrant neon colors for all game elements
+- **Enhanced Ship Graphics**: Sleek fighter design with engine glow effects
 - **Explosion Effects**: Animated explosions when enemies or player are hit
 - **Clean UI**: Score, lives, and wave information clearly displayed
 

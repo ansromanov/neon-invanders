@@ -16,7 +16,7 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Neon Space Invaders")
+        pygame.display.set_caption("Neon Invaders")
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
         self.big_font = pygame.font.Font(None, 72)
@@ -114,12 +114,17 @@ class Game:
     def player_shoot(self):
         """Handle player shooting."""
         if self.player and self.player.can_shoot(pygame.time.get_ticks()):
-            bullet = self.player.shoot(pygame.time.get_ticks())
-            self.player_bullets.add(bullet)
-            self.all_sprites.add(bullet)
+            bullets = self.player.shoot(pygame.time.get_ticks())
+            for bullet in bullets:
+                self.player_bullets.add(bullet)
+                self.all_sprites.add(bullet)
 
     def enemy_shoot(self):
         """Handle enemy shooting."""
+        # Don't shoot if frozen
+        if self.enemy_group.frozen:
+            return
+
         bottom_enemies = self.enemy_group.get_bottom_enemies()
         for enemy in bottom_enemies:
             if enemy.can_shoot():
@@ -193,7 +198,36 @@ class Game:
         # Player collecting bonuses
         collected_bonuses = pygame.sprite.spritecollide(self.player, self.bonuses, True)
         for bonus in collected_bonuses:
-            self.player.score += bonus.value
+            self.apply_bonus_effect(bonus.shape_type)
+
+    def apply_bonus_effect(self, bonus_type: int):
+        """Apply bonus effect based on Tetris block type."""
+        current_time = pygame.time.get_ticks()
+
+        if bonus_type == BonusType.EXTRA_LIFE:
+            # O-block (cyan) - add 1 life
+            self.player.add_life()
+            self.player.score += BONUS_SCORE
+
+        elif bonus_type == BonusType.FREEZE_ENEMIES:
+            # T-block (yellow) - freeze enemies for 5 seconds
+            self.enemy_group.freeze(FREEZE_DURATION)
+            self.player.score += BONUS_SCORE
+
+        elif bonus_type == BonusType.TRIPLE_SHOT:
+            # I-block (purple) - triple shot
+            self.player.activate_triple_shot()
+            self.player.score += BONUS_SCORE
+
+        elif bonus_type == BonusType.SHIELD:
+            # S-block (pink) - temporary shield
+            self.player.activate_shield(current_time)
+            self.player.score += BONUS_SCORE
+
+        elif bonus_type == BonusType.RAPID_FIRE:
+            # Z-block (green) - rapid fire
+            self.player.activate_rapid_fire(current_time)
+            self.player.score += BONUS_SCORE
 
     def next_wave(self):
         """Progress to next wave."""
@@ -207,7 +241,7 @@ class Game:
         self.screen.fill(BLACK)
 
         # Title
-        title_text = self.big_font.render("SPACE INVADERS", True, NEON_GREEN)
+        title_text = self.big_font.render("NEON INVADERS", True, NEON_GREEN)
         title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
         self.screen.blit(title_text, title_rect)
 
@@ -249,6 +283,32 @@ class Game:
 
         wave_text = self.font.render(f"Wave: {self.wave}", True, NEON_YELLOW)
         self.screen.blit(wave_text, (SCREEN_WIDTH - 150, 10))
+
+        # Draw active bonuses
+        y_offset = 90
+        if self.player.shield_active:
+            shield_text = self.font.render("SHIELD ACTIVE", True, NEON_PINK)
+            self.screen.blit(shield_text, (10, y_offset))
+            y_offset += 30
+
+        if self.player.rapid_fire_active:
+            rapid_text = self.font.render("RAPID FIRE", True, NEON_GREEN)
+            self.screen.blit(rapid_text, (10, y_offset))
+            y_offset += 30
+
+        if self.enemy_group.frozen:
+            freeze_text = self.font.render("ENEMIES FROZEN", True, NEON_YELLOW)
+            self.screen.blit(freeze_text, (10, y_offset))
+
+        # Draw shield visual effect
+        if self.player.shield_active:
+            pygame.draw.circle(
+                self.screen,
+                (*NEON_CYAN, 100),
+                (self.player.rect.centerx, self.player.rect.centery),
+                35,
+                3,
+            )
 
     def draw_paused(self):
         """Draw pause screen."""

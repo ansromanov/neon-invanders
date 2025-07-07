@@ -21,6 +21,81 @@ class Player(pygame.sprite.Sprite):
         self.last_shot_time = 0
         self.score = 0
 
+        # Bonus effects
+        self.triple_shot_active = False
+        self.rapid_fire_active = False
+        self.rapid_fire_end_time = 0
+        self.shield_active = False
+        self.shield_end_time = 0
+
+    def can_shoot(self, current_time: int) -> bool:
+        """Check if player can shoot based on cooldown."""
+        cooldown = PLAYER_SHOOT_COOLDOWN
+        if self.rapid_fire_active and current_time < self.rapid_fire_end_time:
+            cooldown = PLAYER_SHOOT_COOLDOWN // 3  # 3x faster shooting
+        return current_time - self.last_shot_time > cooldown
+
+    def shoot(self, current_time: int) -> List["Bullet"]:
+        """Create bullets at player position."""
+        self.last_shot_time = current_time
+        bullets = []
+
+        if self.triple_shot_active:
+            # Triple shot - triangular pattern
+            bullets.append(
+                TripleShotBullet(
+                    self.rect.centerx - 10, self.rect.top, -BULLET_SPEED, "player", -0.2
+                )
+            )
+            bullets.append(
+                TripleShotBullet(
+                    self.rect.centerx, self.rect.top - 5, -BULLET_SPEED, "player", 0
+                )
+            )
+            bullets.append(
+                TripleShotBullet(
+                    self.rect.centerx + 10, self.rect.top, -BULLET_SPEED, "player", 0.2
+                )
+            )
+            self.triple_shot_active = False  # One-time use
+        else:
+            bullets.append(
+                Bullet(self.rect.centerx, self.rect.top, -BULLET_SPEED, "player")
+            )
+
+        return bullets
+
+    def hit(self):
+        """Handle player being hit."""
+        if self.shield_active and pygame.time.get_ticks() < self.shield_end_time:
+            # Shield absorbs the hit
+            self.shield_active = False
+            self.shield_end_time = 0
+        else:
+            self.lives -= 1
+
+    def is_alive(self) -> bool:
+        """Check if player has lives remaining."""
+        return self.lives > 0
+
+    def add_life(self):
+        """Add an extra life."""
+        self.lives += 1
+
+    def activate_rapid_fire(self, current_time: int):
+        """Activate rapid fire bonus."""
+        self.rapid_fire_active = True
+        self.rapid_fire_end_time = current_time + RAPID_FIRE_DURATION
+
+    def activate_shield(self, current_time: int):
+        """Activate shield bonus."""
+        self.shield_active = True
+        self.shield_end_time = current_time + SHIELD_DURATION
+
+    def activate_triple_shot(self):
+        """Activate triple shot for next shot."""
+        self.triple_shot_active = True
+
     def update(self, keys):
         """Update player position based on input."""
         if keys[pygame.K_LEFT] and self.rect.left > 0:
@@ -28,22 +103,12 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_RIGHT] and self.rect.right < SCREEN_WIDTH:
             self.rect.x += self.speed
 
-    def can_shoot(self, current_time: int) -> bool:
-        """Check if player can shoot based on cooldown."""
-        return current_time - self.last_shot_time > PLAYER_SHOOT_COOLDOWN
-
-    def shoot(self, current_time: int) -> "Bullet":
-        """Create a bullet at player position."""
-        self.last_shot_time = current_time
-        return Bullet(self.rect.centerx, self.rect.top, -BULLET_SPEED, "player")
-
-    def hit(self):
-        """Handle player being hit."""
-        self.lives -= 1
-
-    def is_alive(self) -> bool:
-        """Check if player has lives remaining."""
-        return self.lives > 0
+        # Check if bonuses expired
+        current_time = pygame.time.get_ticks()
+        if self.rapid_fire_active and current_time > self.rapid_fire_end_time:
+            self.rapid_fire_active = False
+        if self.shield_active and current_time > self.shield_end_time:
+            self.shield_active = False
 
 
 class Enemy(pygame.sprite.Sprite):
@@ -100,6 +165,28 @@ class Bullet(pygame.sprite.Sprite):
 
         # Remove bullet if it goes off screen
         if self.rect.bottom < 0 or self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+
+class TripleShotBullet(Bullet):
+    """Special bullet for triple shot that moves at an angle."""
+
+    def __init__(self, x: int, y: int, speed: int, owner: str, x_velocity: float):
+        super().__init__(x, y, speed, owner)
+        self.x_velocity = x_velocity
+
+    def update(self):
+        """Update bullet position with angled movement."""
+        self.rect.y += self.speed
+        self.rect.x += int(self.x_velocity * abs(self.speed))
+
+        # Remove bullet if it goes off screen
+        if (
+            self.rect.bottom < 0
+            or self.rect.top > SCREEN_HEIGHT
+            or self.rect.right < 0
+            or self.rect.left > SCREEN_WIDTH
+        ):
             self.kill()
 
 
@@ -160,6 +247,8 @@ class EnemyGroup:
         self.enemies = pygame.sprite.Group()
         self.moving_right = True
         self.drop_timer = 0
+        self.frozen = False
+        self.freeze_end_time = 0
 
     def create_formation(self, wave: int = 1):
         """Create the initial enemy formation."""
@@ -175,6 +264,14 @@ class EnemyGroup:
 
     def update(self):
         """Update all enemies with formation movement."""
+        # Check if freeze expired
+        if self.frozen and pygame.time.get_ticks() > self.freeze_end_time:
+            self.frozen = False
+
+        # Don't move if frozen
+        if self.frozen:
+            return
+
         # Check if any enemy hit the edge
         hit_edge = False
         for enemy in self.enemies:
@@ -221,3 +318,8 @@ class EnemyGroup:
             if enemy.rect.bottom > player_rect.top - 50:
                 return True
         return False
+
+    def freeze(self, duration: int):
+        """Freeze all enemies for specified duration."""
+        self.frozen = True
+        self.freeze_end_time = pygame.time.get_ticks() + duration

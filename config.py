@@ -44,6 +44,20 @@ BONUS_FALL_SPEED = 2
 BONUS_SCORE = 50
 BONUS_SPAWN_CHANCE = 0.2  # Chance when enemy is killed
 
+
+# Bonus types
+class BonusType:
+    EXTRA_LIFE = 0  # O-block (cyan) - adds 1 life
+    FREEZE_ENEMIES = 1  # T-block (yellow) - stops enemies for 5 seconds
+    TRIPLE_SHOT = 2  # I-block (purple) - fire 3 bullets in triangular pattern
+    SHIELD = 3  # S-block (pink) - temporary shield
+    RAPID_FIRE = 4  # Z-block (green) - faster shooting for 5 seconds
+
+
+FREEZE_DURATION = 5000  # 5 seconds in milliseconds
+RAPID_FIRE_DURATION = 5000  # 5 seconds
+SHIELD_DURATION = 3000  # 3 seconds
+
 # Scoring
 ENEMY_SCORE = 10
 WAVE_CLEAR_BONUS = 100

@@ -31,12 +31,52 @@ class SpriteCache:
 
     def _create_player_sprite(self):
         """Create the player ship sprite."""
-        sprite = pygame.Surface((30, 25), pygame.SRCALPHA)
-        # Ship body
-        pygame.draw.polygon(sprite, NEON_CYAN, [(15, 0), (0, 25), (30, 25)])
-        pygame.draw.polygon(sprite, NEON_GREEN, [(15, 5), (5, 20), (25, 20)], 2)
-        # Cockpit
-        pygame.draw.circle(sprite, NEON_YELLOW, (15, 15), 3)
+        sprite = pygame.Surface((40, 30), pygame.SRCALPHA)
+
+        # Main body - sleek fighter design
+        pygame.draw.polygon(
+            sprite,
+            NEON_CYAN,
+            [
+                (20, 0),  # Nose
+                (10, 20),  # Left wing base
+                (5, 25),  # Left wing tip
+                (0, 25),  # Left wing outer
+                (8, 30),  # Left engine
+                (20, 28),  # Center rear
+                (32, 30),  # Right engine
+                (40, 25),  # Right wing outer
+                (35, 25),  # Right wing tip
+                (30, 20),  # Right wing base
+            ],
+        )
+
+        # Wing details
+        pygame.draw.polygon(
+            sprite,
+            NEON_GREEN,
+            [
+                (20, 5),
+                (12, 18),
+                (20, 22),
+                (28, 18),
+            ],
+            2,
+        )
+
+        # Cockpit with glow effect
+        pygame.draw.circle(sprite, NEON_YELLOW, (20, 12), 4)
+        pygame.draw.circle(sprite, NEON_ORANGE, (20, 12), 2)
+
+        # Engine glow
+        pygame.draw.circle(sprite, NEON_PURPLE, (8, 28), 3)
+        pygame.draw.circle(sprite, NEON_PURPLE, (32, 28), 3)
+
+        # Highlight lines
+        pygame.draw.line(sprite, NEON_GREEN, (20, 0), (20, 8), 2)
+        pygame.draw.line(sprite, NEON_CYAN, (5, 25), (12, 20), 1)
+        pygame.draw.line(sprite, NEON_CYAN, (35, 25), (28, 20), 1)
+
         return sprite
 
     def _create_enemy_sprite(self):
