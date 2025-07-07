@@ -57,6 +57,12 @@ class Game:
         self.player = None
         self.enemy_group = EnemyGroup()
 
+        # Settings
+        self.sound_enabled = SOUND_ENABLED
+        self.sound_volume = SOUND_VOLUME
+        self.show_fps = False
+        self.difficulty = "Normal"  # Easy, Normal, Hard
+
     def load_high_score(self) -> int:
         """Load high score from file."""
         try:
@@ -91,9 +97,9 @@ class Game:
         self.player = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 50)
         self.all_sprites.add(self.player)
 
-        # Reset wave and create enemies
+        # Reset wave and create enemies with difficulty modifier
         self.wave = 1
-        self.enemy_group.create_formation(self.wave)
+        self.enemy_group.create_formation(self.wave, self.get_difficulty_modifier())
         self.all_sprites.add(self.enemy_group.enemies)
 
     def handle_events(self):
@@ -107,6 +113,9 @@ class Game:
                     if event.key == pygame.K_SPACE:
                         self.state = GameState.PLAYING
                         self.reset_game()
+                    elif event.key == pygame.K_s:
+                        self.state = GameState.SETTINGS
+                        self.selected_setting = 0
                     elif event.key == pygame.K_ESCAPE:
                         self.running = False
 
@@ -129,6 +138,16 @@ class Game:
                 elif self.state == GameState.WAVE_CLEAR:
                     if event.key == pygame.K_SPACE:
                         self.next_wave()
+
+                elif self.state == GameState.SETTINGS:
+                    if event.key == pygame.K_ESCAPE:
+                        self.state = GameState.MENU
+                    elif event.key == pygame.K_UP:
+                        self.selected_setting = max(0, self.selected_setting - 1)
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_setting = min(3, self.selected_setting + 1)
+                    elif event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+                        self.handle_setting_change(event.key)
 
     def player_shoot(self):
         """Handle player shooting."""
@@ -274,9 +293,45 @@ class Game:
     def next_wave(self):
         """Progress to next wave."""
         self.wave += 1
-        self.enemy_group.create_formation(self.wave)
+        self.enemy_group.create_formation(self.wave, self.get_difficulty_modifier())
         self.all_sprites.add(self.enemy_group.enemies)
         self.state = GameState.PLAYING
+
+    def get_difficulty_modifier(self):
+        """Get difficulty modifier for enemy behavior."""
+        if self.difficulty == "Easy":
+            return 0.7  # 30% slower/less aggressive
+        elif self.difficulty == "Hard":
+            return 1.5  # 50% faster/more aggressive
+        return 1.0  # Normal
+
+    def handle_setting_change(self, key):
+        """Handle changing settings values."""
+        if self.selected_setting == 0:  # Sound
+            if key == pygame.K_LEFT or key == pygame.K_RIGHT:
+                self.sound_enabled = not self.sound_enabled
+                # Update global sound state
+                global SOUND_ENABLED
+                SOUND_ENABLED = self.sound_enabled
+        elif self.selected_setting == 1:  # Volume
+            if key == pygame.K_LEFT and self.sound_volume > 0:
+                self.sound_volume = max(0, self.sound_volume - 0.1)
+            elif key == pygame.K_RIGHT and self.sound_volume < 1:
+                self.sound_volume = min(1, self.sound_volume + 0.1)
+            # Update all sound volumes
+            for sound in sound_manager.sounds.values():
+                sound.set_volume(self.sound_volume)
+        elif self.selected_setting == 2:  # FPS Display
+            if key == pygame.K_LEFT or key == pygame.K_RIGHT:
+                self.show_fps = not self.show_fps
+        elif self.selected_setting == 3:  # Difficulty
+            difficulties = ["Easy", "Normal", "Hard"]
+            current_idx = difficulties.index(self.difficulty)
+            if key == pygame.K_LEFT:
+                current_idx = (current_idx - 1) % len(difficulties)
+            elif key == pygame.K_RIGHT:
+                current_idx = (current_idx + 1) % len(difficulties)
+            self.difficulty = difficulties[current_idx]
 
     def draw_menu(self):
         """Draw main menu."""
@@ -300,11 +355,9 @@ class Game:
         start_rect = start_text.get_rect(center=(SCREEN_WIDTH // 2, 350))
         self.screen.blit(start_text, start_rect)
 
-        controls_text = self.font.render(
-            "Arrow Keys: Move | Space: Shoot", True, NEON_PURPLE
-        )
-        controls_rect = controls_text.get_rect(center=(SCREEN_WIDTH // 2, 400))
-        self.screen.blit(controls_text, controls_rect)
+        settings_text = self.font.render("Press S for Settings", True, NEON_PURPLE)
+        settings_rect = settings_text.get_rect(center=(SCREEN_WIDTH // 2, 400))
+        self.screen.blit(settings_text, settings_rect)
 
         quit_text = self.font.render("Press ESC to Quit", True, NEON_PINK)
         quit_rect = quit_text.get_rect(center=(SCREEN_WIDTH // 2, 450))
@@ -353,6 +406,13 @@ class Game:
                 35,
                 3,
             )
+
+        # Draw FPS if enabled
+        if self.show_fps:
+            fps_text = self.font.render(
+                f"FPS: {int(self.clock.get_fps())}", True, NEON_ORANGE
+            )
+            self.screen.blit(fps_text, (SCREEN_WIDTH - 150, 50))
 
     def draw_paused(self):
         """Draw pause screen."""
@@ -444,10 +504,74 @@ class Game:
         )
         self.screen.blit(continue_text, continue_rect)
 
+    def draw_settings(self):
+        """Draw settings menu."""
+        # Draw background
+        self.screen.blit(self.background, (0, 0))
+
+        # Title
+        title_text = self.big_font.render("SETTINGS", True, NEON_GREEN)
+        title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
+        self.screen.blit(title_text, title_rect)
+
+        # Settings options
+        settings = [
+            ("Sound", "ON" if self.sound_enabled else "OFF"),
+            ("Volume", f"{int(self.sound_volume * 100)}%"),
+            ("Show FPS", "ON" if self.show_fps else "OFF"),
+            ("Difficulty", self.difficulty),
+        ]
+
+        y_start = 200
+        for i, (name, value) in enumerate(settings):
+            # Highlight selected setting
+            color = NEON_YELLOW if i == self.selected_setting else NEON_CYAN
+
+            # Draw setting name
+            name_text = self.font.render(name + ":", True, color)
+            name_rect = name_text.get_rect(
+                midright=(SCREEN_WIDTH // 2 - 20, y_start + i * 60)
+            )
+            self.screen.blit(name_text, name_rect)
+
+            # Draw setting value
+            value_text = self.font.render(value, True, color)
+            value_rect = value_text.get_rect(
+                midleft=(SCREEN_WIDTH // 2 + 20, y_start + i * 60)
+            )
+            self.screen.blit(value_text, value_rect)
+
+            # Draw arrows for selected setting
+            if i == self.selected_setting:
+                left_arrow = self.font.render("<", True, NEON_PINK)
+                left_rect = left_arrow.get_rect(
+                    midright=(value_rect.left - 10, y_start + i * 60)
+                )
+                self.screen.blit(left_arrow, left_rect)
+
+                right_arrow = self.font.render(">", True, NEON_PINK)
+                right_rect = right_arrow.get_rect(
+                    midleft=(value_rect.right + 10, y_start + i * 60)
+                )
+                self.screen.blit(right_arrow, right_rect)
+
+        # Instructions
+        instructions = self.font.render(
+            "Use UP/DOWN to select, LEFT/RIGHT to change", True, NEON_PURPLE
+        )
+        instructions_rect = instructions.get_rect(center=(SCREEN_WIDTH // 2, 500))
+        self.screen.blit(instructions, instructions_rect)
+
+        back_text = self.font.render("Press ESC to return to menu", True, NEON_PINK)
+        back_rect = back_text.get_rect(center=(SCREEN_WIDTH // 2, 550))
+        self.screen.blit(back_text, back_rect)
+
     def draw(self):
         """Draw appropriate screen based on game state."""
         if self.state == GameState.MENU:
             self.draw_menu()
+        elif self.state == GameState.SETTINGS:
+            self.draw_settings()
         elif self.state == GameState.PLAYING:
             self.draw_game()
         elif self.state == GameState.PAUSED:

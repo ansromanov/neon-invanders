@@ -34,6 +34,8 @@ class SoundManager:
 
     def play(self, sound_name: str):
         """Play a sound by name."""
+        from config import SOUND_ENABLED
+
         if not SOUND_ENABLED:
             return
 

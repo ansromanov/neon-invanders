@@ -66,6 +66,7 @@ WAVE_CLEAR_BONUS = 100
 # Game states
 class GameState:
     MENU = "menu"
+    SETTINGS = "settings"
     PLAYING = "playing"
     PAUSED = "paused"
     GAME_OVER = "game_over"

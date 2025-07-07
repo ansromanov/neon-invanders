@@ -139,7 +139,16 @@ class Enemy(pygame.sprite.Sprite):
 
     def can_shoot(self) -> bool:
         """Randomly determine if enemy shoots this frame."""
-        return random.random() < ENEMY_SHOOT_CHANCE
+        # Get difficulty modifier from game
+        difficulty = 1.0
+        try:
+            from game import Game
+
+            if hasattr(Game, "_instance") and Game._instance:
+                difficulty = Game._instance.get_difficulty_modifier()
+        except:
+            pass
+        return random.random() < ENEMY_SHOOT_CHANCE * difficulty
 
     def shoot(self) -> "Bullet":
         """Create a bullet at enemy position."""
@@ -250,10 +259,12 @@ class EnemyGroup:
         self.frozen = False
         self.freeze_end_time = 0
 
-    def create_formation(self, wave: int = 1):
+    def create_formation(self, wave: int = 1, difficulty_modifier: float = 1.0):
         """Create the initial enemy formation."""
         self.enemies.empty()
-        speed_multiplier = 1 + (wave - 1) * 0.2  # Increase speed each wave
+        speed_multiplier = (
+            1 + (wave - 1) * 0.2
+        ) * difficulty_modifier  # Increase speed each wave with difficulty
 
         for row in range(ENEMY_ROWS):
             for col in range(ENEMY_COLS):
