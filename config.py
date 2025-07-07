@@ -70,3 +70,8 @@ class GameState:
     PAUSED = "paused"
     GAME_OVER = "game_over"
     WAVE_CLEAR = "wave_clear"
+
+
+# Sound settings
+SOUND_ENABLED = True
+SOUND_VOLUME = 0.7

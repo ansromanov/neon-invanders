@@ -8,6 +8,7 @@ from typing import Optional
 from config import *
 from entities import Player, Enemy, Bullet, Bonus, Explosion, EnemyGroup
 from sprites import sprite_cache
+from sounds import sound_manager
 
 
 class Game:
@@ -20,6 +21,24 @@ class Game:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
         self.big_font = pygame.font.Font(None, 72)
+
+        # Load and scale background image
+        try:
+            self.background = pygame.image.load("background.png").convert()
+            self.background = pygame.transform.scale(
+                self.background, (SCREEN_WIDTH, SCREEN_HEIGHT)
+            )
+        except pygame.error:
+            # If background.png doesn't exist, create a simple gradient background
+            self.background = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            for y in range(SCREEN_HEIGHT):
+                color_value = int(20 + (y / SCREEN_HEIGHT) * 30)
+                pygame.draw.line(
+                    self.background,
+                    (color_value, 0, color_value),
+                    (0, y),
+                    (SCREEN_WIDTH, y),
+                )
 
         # Game state
         self.state = GameState.MENU
@@ -118,6 +137,8 @@ class Game:
             for bullet in bullets:
                 self.player_bullets.add(bullet)
                 self.all_sprites.add(bullet)
+            # Play shooting sound
+            sound_manager.play("player_shoot")
 
     def enemy_shoot(self):
         """Handle enemy shooting."""
@@ -131,6 +152,8 @@ class Game:
                 bullet = enemy.shoot()
                 self.enemy_bullets.add(bullet)
                 self.all_sprites.add(bullet)
+                # Play enemy shooting sound
+                sound_manager.play("enemy_shoot")
 
     def update(self):
         """Update game state."""
@@ -158,13 +181,19 @@ class Game:
         if not self.player.is_alive():
             self.state = GameState.GAME_OVER
             self.save_high_score()
+            # Play game over sound
+            sound_manager.play("game_over")
         elif self.enemy_group.check_player_collision(self.player.rect):
             self.player.lives = 0
             self.state = GameState.GAME_OVER
             self.save_high_score()
+            # Play game over sound
+            sound_manager.play("game_over")
         elif self.enemy_group.is_empty():
             self.state = GameState.WAVE_CLEAR
             self.player.score += WAVE_CLEAR_BONUS
+            # Play wave clear sound
+            sound_manager.play("wave_clear")
 
     def check_collisions(self):
         """Check all game collisions."""
@@ -180,6 +209,8 @@ class Game:
                     explosion = Explosion(enemy.rect.centerx, enemy.rect.centery)
                     self.explosions.add(explosion)
                     self.all_sprites.add(explosion)
+                    # Play explosion sound
+                    sound_manager.play("explosion")
 
                     # Chance to spawn bonus
                     if random.random() < BONUS_SPAWN_CHANCE:
@@ -190,6 +221,12 @@ class Game:
         # Enemy bullets hitting player
         hit_player = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
         if hit_player:
+            if self.player.shield_active:
+                # Play shield hit sound
+                sound_manager.play("shield_hit")
+            else:
+                # Play explosion sound
+                sound_manager.play("explosion")
             self.player.hit()
             explosion = Explosion(self.player.rect.centerx, self.player.rect.centery)
             self.explosions.add(explosion)
@@ -199,6 +236,8 @@ class Game:
         collected_bonuses = pygame.sprite.spritecollide(self.player, self.bonuses, True)
         for bonus in collected_bonuses:
             self.apply_bonus_effect(bonus.shape_type)
+            # Play bonus collection sound
+            sound_manager.play("bonus_collect")
 
     def apply_bonus_effect(self, bonus_type: int):
         """Apply bonus effect based on Tetris block type."""
@@ -229,6 +268,9 @@ class Game:
             self.player.activate_rapid_fire(current_time)
             self.player.score += BONUS_SCORE
 
+        # Play power-up sound for all bonus types
+        sound_manager.play("power_up")
+
     def next_wave(self):
         """Progress to next wave."""
         self.wave += 1
@@ -238,7 +280,8 @@ class Game:
 
     def draw_menu(self):
         """Draw main menu."""
-        self.screen.fill(BLACK)
+        # Draw background
+        self.screen.blit(self.background, (0, 0))
 
         # Title
         title_text = self.big_font.render("NEON INVADERS", True, NEON_GREEN)
@@ -269,7 +312,8 @@ class Game:
 
     def draw_game(self):
         """Draw game play screen."""
-        self.screen.fill(BLACK)
+        # Draw background
+        self.screen.blit(self.background, (0, 0))
 
         # Draw all sprites
         self.all_sprites.draw(self.screen)
@@ -335,7 +379,14 @@ class Game:
 
     def draw_game_over(self):
         """Draw game over screen."""
-        self.screen.fill(BLACK)
+        # Draw background
+        self.screen.blit(self.background, (0, 0))
+
+        # Darken background for game over
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(180)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
 
         # Game over text
         game_over_text = self.big_font.render("GAME OVER", True, NEON_RED)
