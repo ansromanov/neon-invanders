@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Run the test suite using pytest."""
 
-import sys
-import subprocess
 import os
+import subprocess
+import sys
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
     print(f"Command: {' '.join(pytest_args)}")
     print("-" * 70)
 
-    result = subprocess.run(pytest_args)
+    result = subprocess.run(pytest_args, check=False)
 
     # Exit with the same code as pytest
     sys.exit(result.returncode)

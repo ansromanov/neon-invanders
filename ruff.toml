@@ -1,0 +1,61 @@
+# Ruff configuration for AWS Retro Game Challenge
+
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "DTZ", # flake8-datetimez
+    "T10", # flake8-debugger
+    "EXE", # flake8-executable
+    "ISC", # flake8-implicit-str-concat
+    "PIE", # flake8-pie
+    "PT",  # flake8-pytest-style
+    "Q",   # flake8-quotes
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "TID", # flake8-tidy-imports
+    "ARG", # flake8-unused-arguments
+    "PL",  # pylint
+    "RUF", # ruff-specific rules
+]
+
+# Ignore specific rules
+ignore = [
+    "E501",    # line too long (handled by formatter)
+    "PLR0913", # too many arguments
+    "PLR2004", # magic value comparison
+]
+
+# Set Python version
+target-version = "py311"
+
+# Set line length
+line-length = 88
+
+# Exclude files and directories
+exclude = [".git", ".venv", "__pycache__", "build", "dist"]
+
+# Configure specific rules
+[per-file-ignores]
+"tests/*" = [
+    "S101",
+    "PLR2004",
+] # assert statements and magic values are ok in tests
+
+[isort]
+known-first-party = ["config", "entities", "game", "sprites", "sounds"]
+
+[mccabe]
+max-complexity = 10
+
+[pylint]
+max-args = 6
+max-branches = 12
+max-returns = 6
+max-statements = 50

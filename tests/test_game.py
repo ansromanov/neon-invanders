@@ -1,18 +1,18 @@
 """Unit tests for game logic and state management."""
 
-import pytest
-import pygame
-from unittest.mock import Mock, patch, MagicMock
-import sys
 import os
-import json
+import sys
+from unittest.mock import patch
+
+import pygame
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from game import Game
 from config import *
-from entities import Player, Enemy, Bullet, Bonus
+from entities import Bonus, Bullet, Player
+from game import Game
 
 
 class TestGame:

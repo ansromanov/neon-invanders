@@ -1,0 +1,36 @@
+# Codecov configuration for AWS Retro Game Challenge
+
+coverage:
+  status:
+    project:
+      default:
+        target: 80% # Minimum coverage target
+        threshold: 5% # Allow 5% drop in coverage
+    patch:
+      default:
+        target: 80% # New code should have at least 80% coverage
+        threshold: 10% # Allow 10% drop for patches
+
+parsers:
+  gcov:
+    branch_detection:
+      conditional: yes
+      loop: yes
+      method: no
+      macro: no
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+ignore:
+  - "tests/**/*"
+  - "**/__pycache__/**/*"
+  - ".venv/**/*"
+  - "*.md"
+  - "*.toml"
+  - "*.yml"
+  - "*.yaml"

@@ -1,16 +1,17 @@
 """Unit tests for sprite creation and caching."""
 
-import pytest
-import pygame
-from unittest.mock import Mock, patch, MagicMock
-import sys
 import os
+import sys
+from unittest.mock import MagicMock, patch
+
+import pygame
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sprites import SpriteCache
 from config import *
+from sprites import SpriteCache
 
 
 class TestSpriteCache:

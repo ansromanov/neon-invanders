@@ -1,8 +1,9 @@
 """Game entities: Player, Enemy, Bullet, and Bonus classes."""
 
-import pygame
 import random
-from typing import List, Tuple
+
+import pygame
+
 from config import *
 from sprites import sprite_cache
 
@@ -35,7 +36,7 @@ class Player(pygame.sprite.Sprite):
             cooldown = PLAYER_SHOOT_COOLDOWN // 3  # 3x faster shooting
         return current_time - self.last_shot_time > cooldown
 
-    def shoot(self, current_time: int) -> List["Bullet"]:
+    def shoot(self, current_time: int) -> list["Bullet"]:
         """Create bullets at player position."""
         self.last_shot_time = current_time
         bullets = []
@@ -300,7 +301,7 @@ class EnemyGroup:
         # Update all enemies
         self.enemies.update()
 
-    def get_bottom_enemies(self) -> List[Enemy]:
+    def get_bottom_enemies(self) -> list[Enemy]:
         """Get enemies that can shoot (bottom row of each column)."""
         # Group enemies by column
         columns = {}

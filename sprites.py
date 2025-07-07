@@ -1,6 +1,7 @@
 """Sprite creation and caching for game entities."""
 
 import pygame
+
 from config import *
 
 

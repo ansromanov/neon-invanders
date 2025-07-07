@@ -40,22 +40,42 @@ A modern, neon-themed implementation of the classic Space Invaders game with imp
 
 - Python 3.11 or higher
 - pygame 2.6.1 or higher
+- uv (recommended for package management)
 
-### Setup
+### Quick Setup
 
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd aws-retro-game-challenge
 
-# Install dependencies using uv (recommended)
-uv pip install -e .
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Or install with pip
+# Create virtual environment and install dependencies
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install the game
+uv sync
+
+# For development (includes testing, linting, and tooling)
+uv sync --all-extras
+make pre-commit  # Install pre-commit hooks
+```
+
+### Alternative Setup (pip)
+
+```bash
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install the game
 pip install -e .
 
-# For development (includes testing dependencies)
-uv pip install -e ".[dev]"
+# For development
+pip install -e ".[dev]"
 ```
 
 ## How to Play
@@ -125,12 +145,36 @@ aws-retro-game-challenge/
 
 ## Development
 
+### Quick Development Commands
+
+```bash
+# Run the game
+make run
+
+# Run tests with coverage
+make test-cov
+
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Run all quality checks
+make lint format type-check security
+
+# Clean build artifacts
+make clean
+```
+
 ### Code Style
 
 - Type hints for better code clarity
 - Comprehensive docstrings
 - Following PEP 8 guidelines
 - Proper error handling
+- Ruff for linting and formatting
+- Black-compatible formatting (88 char line length)
 
 ### Testing Strategy
 
@@ -139,6 +183,33 @@ aws-retro-game-challenge/
 - Collision detection tests
 - State transition tests
 - Mock objects for random and time-based functionality
+- Coverage target: >80%
+
+### Development Tools
+
+- **Package Management**: uv
+- **Linting/Formatting**: Ruff
+- **Type Checking**: mypy
+- **Testing**: pytest with coverage
+- **Security**: bandit
+- **Pre-commit**: Automated code quality checks
+- **CI/CD**: GitHub Actions
+- **Containerization**: Docker & Docker Compose
+
+### Docker Development
+
+```bash
+# Run the game in Docker
+docker-compose up game
+
+# Run tests in Docker
+docker-compose run test
+
+# Development shell
+docker-compose run dev
+```
+
+For detailed development instructions, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 

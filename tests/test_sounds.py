@@ -1,17 +1,18 @@
 """Unit tests for sound generation and management."""
 
-import pytest
-import pygame
-import numpy as np
-from unittest.mock import Mock, patch, MagicMock, call
-import sys
 import os
+import sys
+from unittest.mock import MagicMock, patch
+
+import numpy as np
+import pygame
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from config import SOUND_VOLUME
 from sounds import SoundManager
-from config import SOUND_ENABLED, SOUND_VOLUME
 
 
 class TestSoundManager:

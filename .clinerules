@@ -1,0 +1,39 @@
+# Cline Development Rules for AWS Retro Game Challenge
+
+## Performance & Quality
+
+- Write code optimized for performance
+- Use ruff for linting and code quality checks
+- Follow Python best practices and PEP 8
+- After making code changes, run the following quality checks:
+  1. `make format` - to automatically format code
+  2. `make lint` - to check for code style issues
+  3. `make type-check` - to verify type annotations
+
+## Development Environment
+
+- Always start with `uv` for dependency management
+- Run `source .venv/bin/activate` when opening a new terminal
+- Use the project's virtual environment for all operations
+
+## Testing
+
+- Write or update tests for any code changes
+- Ensure all tests pass before completing tasks
+- Use pytest for testing framework
+- Mock external dependencies appropriately
+
+## Code Style
+
+- Be quiet and concise in code writing
+- Write readable, maintainable code
+- Use clear variable and function names
+- Add docstrings for classes and functions
+- Keep functions focused and single-purpose
+
+## General Guidelines
+
+- Prioritize code readability over cleverness
+- Handle errors gracefully
+- Use type hints where appropriate
+- Keep dependencies minimal and well-documented

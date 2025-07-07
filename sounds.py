@@ -1,7 +1,8 @@
 """Sound generation and management for Neon Invaders."""
 
-import pygame
 import numpy as np
+import pygame
+
 from config import SOUND_ENABLED, SOUND_VOLUME
 
 
@@ -331,7 +332,7 @@ class SoundManager:
         harmonics = [1, 1.6, 2.3, 3.7, 4.9]
         amplitudes = [0.5, 0.3, 0.2, 0.15, 0.1]
 
-        for harmonic, amplitude in zip(harmonics, amplitudes):
+        for harmonic, amplitude in zip(harmonics, amplitudes, strict=False):
             sound += amplitude * np.sin(2 * np.pi * base_freq * harmonic * t)
 
         # Quick attack and decay for impact

@@ -1,24 +1,25 @@
 """Unit tests for game entities."""
 
-import pytest
-import pygame
-from unittest.mock import Mock, patch
-import sys
 import os
+import sys
+from unittest.mock import patch
+
+import pygame
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from config import *
 from entities import (
-    Player,
-    Enemy,
-    Bullet,
     Bonus,
-    Explosion,
+    Bullet,
+    Enemy,
     EnemyGroup,
+    Explosion,
+    Player,
     TripleShotBullet,
 )
-from config import *
 from sprites import sprite_cache
 
 

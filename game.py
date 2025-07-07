@@ -1,13 +1,13 @@
 """Main game logic and state management."""
 
-import pygame
-import random
 import json
 import os
-from typing import Optional
+import random
+
+import pygame
+
 from config import *
-from entities import Player, Enemy, Bullet, Bonus, Explosion, EnemyGroup
-from sprites import sprite_cache
+from entities import Bonus, EnemyGroup, Explosion, Player
 from sounds import sound_manager
 
 
@@ -67,7 +67,7 @@ class Game:
         """Load high score from file."""
         try:
             if os.path.exists("highscore.json"):
-                with open("highscore.json", "r") as f:
+                with open("highscore.json") as f:
                     data = json.load(f)
                     return data.get("high_score", 0)
         except:
@@ -301,7 +301,7 @@ class Game:
         """Get difficulty modifier for enemy behavior."""
         if self.difficulty == "Easy":
             return 0.7  # 30% slower/less aggressive
-        elif self.difficulty == "Hard":
+        if self.difficulty == "Hard":
             return 1.5  # 50% faster/more aggressive
         return 1.0  # Normal
 
