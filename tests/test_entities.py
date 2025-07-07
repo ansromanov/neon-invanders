@@ -1,6 +1,6 @@
 """Unit tests for game entities."""
 
-import unittest
+import pytest
 import pygame
 from unittest.mock import Mock, patch
 import sys
@@ -9,39 +9,54 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from entities import Player, Enemy, Bullet, Bonus, Explosion, EnemyGroup
+from entities import (
+    Player,
+    Enemy,
+    Bullet,
+    Bonus,
+    Explosion,
+    EnemyGroup,
+    TripleShotBullet,
+)
 from config import *
+from sprites import sprite_cache
 
 
-class TestPlayer(unittest.TestCase):
+class TestPlayer:
     """Test cases for Player entity."""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures."""
         pygame.init()
         self.player = Player(400, 500)
+        yield
+        pygame.quit()
 
     def test_player_initialization(self):
         """Test player is initialized correctly."""
-        self.assertEqual(self.player.rect.centerx, 400)
-        self.assertEqual(self.player.rect.centery, 500)
-        self.assertEqual(self.player.speed, PLAYER_SPEED)
-        self.assertEqual(self.player.lives, PLAYER_LIVES)
-        self.assertEqual(self.player.score, 0)
+        assert self.player.rect.centerx == 400
+        assert self.player.rect.centery == 500
+        assert self.player.speed == PLAYER_SPEED
+        assert self.player.lives == PLAYER_LIVES
+        assert self.player.score == 0
+        assert self.player.triple_shot_active is False
+        assert self.player.rapid_fire_active is False
+        assert self.player.shield_active is False
 
     def test_player_movement_left(self):
         """Test player moves left correctly."""
         keys = {pygame.K_LEFT: True, pygame.K_RIGHT: False}
         initial_x = self.player.rect.x
         self.player.update(keys)
-        self.assertEqual(self.player.rect.x, initial_x - PLAYER_SPEED)
+        assert self.player.rect.x == initial_x - PLAYER_SPEED
 
     def test_player_movement_right(self):
         """Test player moves right correctly."""
         keys = {pygame.K_LEFT: False, pygame.K_RIGHT: True}
         initial_x = self.player.rect.x
         self.player.update(keys)
-        self.assertEqual(self.player.rect.x, initial_x + PLAYER_SPEED)
+        assert self.player.rect.x == initial_x + PLAYER_SPEED
 
     def test_player_boundary_left(self):
         """Test player can't move past left boundary."""
@@ -49,12 +64,12 @@ class TestPlayer(unittest.TestCase):
         keys = {pygame.K_LEFT: True, pygame.K_RIGHT: False}
         initial_x = self.player.rect.x
         self.player.update(keys)
-        self.assertEqual(self.player.rect.x, initial_x - PLAYER_SPEED)
+        assert self.player.rect.x == initial_x - PLAYER_SPEED
 
         self.player.rect.left = 0
         initial_x = self.player.rect.x
         self.player.update(keys)
-        self.assertEqual(self.player.rect.x, initial_x)  # Should not move
+        assert self.player.rect.x == initial_x  # Should not move
 
     def test_player_boundary_right(self):
         """Test player can't move past right boundary."""
@@ -62,123 +77,185 @@ class TestPlayer(unittest.TestCase):
         keys = {pygame.K_LEFT: False, pygame.K_RIGHT: True}
         initial_x = self.player.rect.x
         self.player.update(keys)
-        self.assertEqual(self.player.rect.x, initial_x + PLAYER_SPEED)
+        assert self.player.rect.x == initial_x + PLAYER_SPEED
 
         self.player.rect.right = SCREEN_WIDTH
         initial_x = self.player.rect.x
         self.player.update(keys)
-        self.assertEqual(self.player.rect.x, initial_x)  # Should not move
+        assert self.player.rect.x == initial_x  # Should not move
 
     def test_player_can_shoot(self):
         """Test player shooting cooldown."""
         current_time = 1000
-        self.assertTrue(self.player.can_shoot(current_time))
+        assert self.player.can_shoot(current_time) is True
 
         # Shoot and check cooldown
-        bullet = self.player.shoot(current_time)
-        self.assertIsInstance(bullet, Bullet)
-        self.assertFalse(self.player.can_shoot(current_time + 100))
-        self.assertTrue(self.player.can_shoot(current_time + PLAYER_SHOOT_COOLDOWN + 1))
+        bullets = self.player.shoot(current_time)
+        assert isinstance(bullets, list)
+        assert len(bullets) == 1
+        assert isinstance(bullets[0], Bullet)
+        assert self.player.can_shoot(current_time + 100) is False
+        assert self.player.can_shoot(current_time + PLAYER_SHOOT_COOLDOWN + 1) is True
+
+    def test_player_triple_shot(self):
+        """Test player triple shot functionality."""
+        self.player.activate_triple_shot()
+        assert self.player.triple_shot_active is True
+
+        current_time = 1000
+        bullets = self.player.shoot(current_time)
+        assert len(bullets) == 3
+        assert all(isinstance(b, TripleShotBullet) for b in bullets)
+        assert self.player.triple_shot_active is False  # One-time use
+
+    def test_player_rapid_fire(self):
+        """Test player rapid fire functionality."""
+        current_time = 1000
+        self.player.activate_rapid_fire(current_time)
+        assert self.player.rapid_fire_active is True
+        assert self.player.rapid_fire_end_time == current_time + RAPID_FIRE_DURATION
+
+        # Test faster shooting cooldown
+        bullets = self.player.shoot(current_time)
+        # With rapid fire, cooldown should be 1/3 of normal (250 // 3 = 83)
+        rapid_cooldown = PLAYER_SHOOT_COOLDOWN // 3
+        assert self.player.can_shoot(current_time + rapid_cooldown) is False
+        assert self.player.can_shoot(current_time + rapid_cooldown + 1) is True
+
+        # Test expiration
+        keys = {pygame.K_LEFT: False, pygame.K_RIGHT: False}
+        self.player.update(keys)
+        with patch(
+            "pygame.time.get_ticks", return_value=current_time + RAPID_FIRE_DURATION + 1
+        ):
+            self.player.update(keys)
+        assert self.player.rapid_fire_active is False
+
+    def test_player_shield(self):
+        """Test player shield functionality."""
+        current_time = 1000
+        self.player.activate_shield(current_time)
+        assert self.player.shield_active is True
+        assert self.player.shield_end_time == current_time + SHIELD_DURATION
+
+        # Test shield blocks hit
+        with patch("pygame.time.get_ticks", return_value=current_time + 100):
+            initial_lives = self.player.lives
+            self.player.hit()
+            assert self.player.lives == initial_lives  # No life lost
+            assert self.player.shield_active is False  # Shield consumed
 
     def test_player_hit(self):
         """Test player loses life when hit."""
         initial_lives = self.player.lives
         self.player.hit()
-        self.assertEqual(self.player.lives, initial_lives - 1)
+        assert self.player.lives == initial_lives - 1
 
     def test_player_is_alive(self):
         """Test player alive status."""
-        self.assertTrue(self.player.is_alive())
+        assert self.player.is_alive() is True
         self.player.lives = 1
-        self.assertTrue(self.player.is_alive())
+        assert self.player.is_alive() is True
         self.player.lives = 0
-        self.assertFalse(self.player.is_alive())
+        assert self.player.is_alive() is False
+
+    def test_player_add_life(self):
+        """Test adding extra life."""
+        initial_lives = self.player.lives
+        self.player.add_life()
+        assert self.player.lives == initial_lives + 1
 
 
-class TestEnemy(unittest.TestCase):
+class TestEnemy:
     """Test cases for Enemy entity."""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures."""
         pygame.init()
         self.enemy = Enemy(100, 100, 0)
+        yield
+        pygame.quit()
 
     def test_enemy_initialization(self):
         """Test enemy is initialized correctly."""
-        self.assertEqual(self.enemy.rect.x, 100)
-        self.assertEqual(self.enemy.rect.y, 100)
-        self.assertEqual(self.enemy.row, 0)
-        self.assertEqual(self.enemy.direction, 1)
-        self.assertEqual(self.enemy.drop_distance, 0)
+        assert self.enemy.rect.x == 100
+        assert self.enemy.rect.y == 100
+        assert self.enemy.row == 0
+        assert self.enemy.direction == 1
+        assert self.enemy.drop_distance == 0
 
     def test_enemy_horizontal_movement(self):
         """Test enemy moves horizontally."""
         initial_x = self.enemy.rect.x
         self.enemy.update()
-        self.assertEqual(self.enemy.rect.x, initial_x + ENEMY_SPEED_X)
+        assert self.enemy.rect.x == initial_x + ENEMY_SPEED_X
 
     def test_enemy_reverse_direction(self):
         """Test enemy reverses direction and drops."""
         self.enemy.reverse_direction()
-        self.assertEqual(self.enemy.direction, -1)
-        self.assertEqual(self.enemy.drop_distance, ENEMY_SPEED_Y)
+        assert self.enemy.direction == -1
+        assert self.enemy.drop_distance == ENEMY_SPEED_Y
 
     def test_enemy_drop_movement(self):
         """Test enemy drops down when required."""
         initial_y = self.enemy.rect.y
         self.enemy.drop_distance = 10
         self.enemy.update()
-        self.assertEqual(self.enemy.rect.y, initial_y + 2)
-        self.assertEqual(self.enemy.drop_distance, 8)
+        assert self.enemy.rect.y == initial_y + 2
+        assert self.enemy.drop_distance == 8
 
     @patch("random.random")
     def test_enemy_can_shoot(self, mock_random):
         """Test enemy shooting probability."""
         mock_random.return_value = 0.0001
-        self.assertTrue(self.enemy.can_shoot())
+        assert self.enemy.can_shoot() is True
 
         mock_random.return_value = 0.01
-        self.assertFalse(self.enemy.can_shoot())
+        assert self.enemy.can_shoot() is False
 
     def test_enemy_shoot(self):
         """Test enemy creates bullet."""
         bullet = self.enemy.shoot()
-        self.assertIsInstance(bullet, Bullet)
-        self.assertEqual(bullet.rect.centerx, self.enemy.rect.centerx)
-        self.assertEqual(bullet.rect.centery, self.enemy.rect.bottom)
-        self.assertEqual(bullet.speed, ENEMY_BULLET_SPEED)
-        self.assertEqual(bullet.owner, "enemy")
+        assert isinstance(bullet, Bullet)
+        assert bullet.rect.centerx == self.enemy.rect.centerx
+        assert bullet.rect.centery == self.enemy.rect.bottom
+        assert bullet.speed == ENEMY_BULLET_SPEED
+        assert bullet.owner == "enemy"
 
 
-class TestBullet(unittest.TestCase):
+class TestBullet:
     """Test cases for Bullet entity."""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures."""
         pygame.init()
+        yield
+        pygame.quit()
 
     def test_player_bullet_initialization(self):
         """Test player bullet is initialized correctly."""
         bullet = Bullet(100, 200, -BULLET_SPEED, "player")
-        self.assertEqual(bullet.rect.centerx, 100)
-        self.assertEqual(bullet.rect.centery, 200)
-        self.assertEqual(bullet.speed, -BULLET_SPEED)
-        self.assertEqual(bullet.owner, "player")
+        assert bullet.rect.centerx == 100
+        assert bullet.rect.centery == 200
+        assert bullet.speed == -BULLET_SPEED
+        assert bullet.owner == "player"
 
     def test_enemy_bullet_initialization(self):
         """Test enemy bullet is initialized correctly."""
         bullet = Bullet(150, 250, ENEMY_BULLET_SPEED, "enemy")
-        self.assertEqual(bullet.rect.centerx, 150)
-        self.assertEqual(bullet.rect.centery, 250)
-        self.assertEqual(bullet.speed, ENEMY_BULLET_SPEED)
-        self.assertEqual(bullet.owner, "enemy")
+        assert bullet.rect.centerx == 150
+        assert bullet.rect.centery == 250
+        assert bullet.speed == ENEMY_BULLET_SPEED
+        assert bullet.owner == "enemy"
 
     def test_bullet_movement(self):
         """Test bullet moves correctly."""
         bullet = Bullet(100, 200, -5, "player")
         initial_y = bullet.rect.y
         bullet.update()
-        self.assertEqual(bullet.rect.y, initial_y - 5)
+        assert bullet.rect.y == initial_y - 5
 
     def test_bullet_removal_top(self):
         """Test bullet is removed when going off top."""
@@ -187,7 +264,7 @@ class TestBullet(unittest.TestCase):
         bullet = Bullet(100, 5, -15, "player")  # centery=5, moving up at speed -15
         group = pygame.sprite.Group(bullet)
         bullet.update()  # After update, centery=-10, so bottom will be -5
-        self.assertEqual(len(group), 0)  # Bullet should be removed
+        assert len(group) == 0  # Bullet should be removed
 
     def test_bullet_removal_bottom(self):
         """Test bullet is removed when going off bottom."""
@@ -196,33 +273,79 @@ class TestBullet(unittest.TestCase):
         bullet = Bullet(100, SCREEN_HEIGHT - 5, 20, "enemy")  # centery at bottom edge
         group = pygame.sprite.Group(bullet)
         bullet.update()  # After update, centery=615, so top will be 610 > SCREEN_HEIGHT
-        self.assertEqual(len(group), 0)  # Bullet should be removed
+        assert len(group) == 0  # Bullet should be removed
 
 
-class TestBonus(unittest.TestCase):
-    """Test cases for Bonus entity."""
+class TestTripleShotBullet:
+    """Test cases for TripleShotBullet entity."""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures."""
         pygame.init()
+        yield
+        pygame.quit()
+
+    def test_triple_shot_bullet_initialization(self):
+        """Test triple shot bullet is initialized correctly."""
+        bullet = TripleShotBullet(100, 200, -BULLET_SPEED, "player", 0.2)
+        assert bullet.rect.centerx == 100
+        assert bullet.rect.centery == 200
+        assert bullet.speed == -BULLET_SPEED
+        assert bullet.owner == "player"
+        assert bullet.x_velocity == 0.2
+
+    def test_triple_shot_bullet_angled_movement(self):
+        """Test triple shot bullet moves at an angle."""
+        bullet = TripleShotBullet(100, 200, -5, "player", 0.5)
+        initial_x = bullet.rect.x
+        initial_y = bullet.rect.y
+        bullet.update()
+        assert bullet.rect.y == initial_y - 5
+        assert bullet.rect.x == initial_x + int(0.5 * 5)
+
+    def test_triple_shot_bullet_removal_sides(self):
+        """Test triple shot bullet is removed when going off sides."""
+        # Test left side
+        bullet = TripleShotBullet(5, 200, -5, "player", -5)
+        group = pygame.sprite.Group(bullet)
+        bullet.update()
+        assert len(group) == 0  # Should be removed
+
+        # Test right side
+        bullet = TripleShotBullet(SCREEN_WIDTH - 5, 200, -5, "player", 5)
+        group = pygame.sprite.Group(bullet)
+        bullet.update()
+        assert len(group) == 0  # Should be removed
+
+
+class TestBonus:
+    """Test cases for Bonus entity."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Set up test fixtures."""
+        pygame.init()
+        yield
+        pygame.quit()
 
     @patch("random.randint")
     def test_bonus_initialization(self, mock_randint):
         """Test bonus is initialized correctly."""
         mock_randint.return_value = 2
         bonus = Bonus(200, 100)
-        self.assertEqual(bonus.rect.centerx, 200)
-        self.assertEqual(bonus.rect.centery, 100)
-        self.assertEqual(bonus.speed, BONUS_FALL_SPEED)
-        self.assertEqual(bonus.value, BONUS_SCORE)
-        self.assertEqual(bonus.shape_type, 2)
+        assert bonus.rect.centerx == 200
+        assert bonus.rect.centery == 100
+        assert bonus.speed == BONUS_FALL_SPEED
+        assert bonus.value == BONUS_SCORE
+        assert bonus.shape_type == 2
 
     def test_bonus_movement(self):
         """Test bonus falls correctly."""
         bonus = Bonus(200, 100)
         initial_y = bonus.rect.y
         bonus.update()
-        self.assertEqual(bonus.rect.y, initial_y + BONUS_FALL_SPEED)
+        assert bonus.rect.y == initial_y + BONUS_FALL_SPEED
 
     def test_bonus_removal(self):
         """Test bonus is removed when falling off screen."""
@@ -235,26 +358,77 @@ class TestBonus(unittest.TestCase):
         # So we need centery > SCREEN_HEIGHT + 10
         for _ in range(20):  # Multiple updates to ensure it goes off screen
             bonus.update()
-        self.assertEqual(len(group), 0)  # Bonus should be removed
+        assert len(group) == 0  # Bonus should be removed
 
 
-class TestEnemyGroup(unittest.TestCase):
+class TestExplosion:
+    """Test cases for Explosion entity."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Set up test fixtures."""
+        pygame.init()
+        yield
+        pygame.quit()
+
+    def test_explosion_initialization(self):
+        """Test explosion is initialized correctly."""
+        with patch.object(
+            sprite_cache,
+            "get",
+            return_value=[pygame.Surface((20, 20)) for _ in range(5)],
+        ):
+            explosion = Explosion(300, 300)
+            assert explosion.rect.centerx == 300
+            assert explosion.rect.centery == 300
+            assert explosion.current_frame == 0
+            assert explosion.animation_speed == 2
+
+    def test_explosion_animation(self):
+        """Test explosion animation progression."""
+        with patch.object(
+            sprite_cache,
+            "get",
+            return_value=[pygame.Surface((20, 20)) for _ in range(5)],
+        ):
+            explosion = Explosion(300, 300)
+            group = pygame.sprite.Group(explosion)
+
+            # Test animation frames
+            for frame in range(5):
+                assert explosion.current_frame == frame
+                explosion.update()
+                explosion.update()  # Two updates per frame (animation_speed = 2)
+
+            # After all frames, explosion should be removed
+            assert len(group) == 0
+
+
+class TestEnemyGroup:
     """Test cases for EnemyGroup management."""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures."""
         pygame.init()
         self.enemy_group = EnemyGroup()
+        yield
+        pygame.quit()
 
     def test_create_formation(self):
         """Test enemy formation creation."""
         self.enemy_group.create_formation(1)
-        self.assertEqual(len(self.enemy_group.enemies), ENEMY_ROWS * ENEMY_COLS)
+        assert len(self.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
 
     def test_create_formation_wave_2(self):
         """Test enemy formation for wave 2."""
         self.enemy_group.create_formation(2)
-        self.assertEqual(len(self.enemy_group.enemies), ENEMY_ROWS * ENEMY_COLS)
+        assert len(self.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
+
+    def test_create_formation_with_difficulty(self):
+        """Test enemy formation with difficulty modifier."""
+        self.enemy_group.create_formation(1, 1.5)  # Hard difficulty
+        assert len(self.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
 
     def test_edge_detection_right(self):
         """Test formation detects right edge."""
@@ -268,7 +442,7 @@ class TestEnemyGroup(unittest.TestCase):
 
         # All enemies should have reversed direction
         for enemy in self.enemy_group.enemies:
-            self.assertEqual(enemy.direction, -1)
+            assert enemy.direction == -1
 
     def test_edge_detection_left(self):
         """Test formation detects left edge."""
@@ -286,7 +460,29 @@ class TestEnemyGroup(unittest.TestCase):
 
         # All enemies should have reversed direction
         for enemy in self.enemy_group.enemies:
-            self.assertEqual(enemy.direction, 1)
+            assert enemy.direction == 1
+
+    def test_freeze_functionality(self):
+        """Test enemy freeze functionality."""
+        self.enemy_group.create_formation(1)
+        current_time = 1000
+
+        with patch("pygame.time.get_ticks", return_value=current_time):
+            self.enemy_group.freeze(5000)
+
+        assert self.enemy_group.frozen is True
+        assert self.enemy_group.freeze_end_time == current_time + 5000
+
+        # Test enemies don't move when frozen
+        enemy = list(self.enemy_group.enemies)[0]
+        initial_x = enemy.rect.x
+        self.enemy_group.update()
+        assert enemy.rect.x == initial_x  # Should not move
+
+        # Test freeze expiration
+        with patch("pygame.time.get_ticks", return_value=current_time + 5001):
+            self.enemy_group.update()
+        assert self.enemy_group.frozen is False
 
     def test_get_bottom_enemies(self):
         """Test getting bottom enemies for shooting."""
@@ -294,7 +490,7 @@ class TestEnemyGroup(unittest.TestCase):
         bottom_enemies = self.enemy_group.get_bottom_enemies()
 
         # Should have one enemy per column
-        self.assertLessEqual(len(bottom_enemies), ENEMY_COLS)
+        assert len(bottom_enemies) <= ENEMY_COLS
 
         # Each should be the lowest in their column
         for bottom_enemy in bottom_enemies:
@@ -304,15 +500,13 @@ class TestEnemyGroup(unittest.TestCase):
                     < ENEMY_SPACING_X // 2
                     and other_enemy != bottom_enemy
                 ):
-                    self.assertGreaterEqual(
-                        bottom_enemy.rect.bottom, other_enemy.rect.bottom
-                    )
+                    assert bottom_enemy.rect.bottom >= other_enemy.rect.bottom
 
     def test_is_empty(self):
         """Test empty check."""
-        self.assertTrue(self.enemy_group.is_empty())
+        assert self.enemy_group.is_empty() is True
         self.enemy_group.create_formation(1)
-        self.assertFalse(self.enemy_group.is_empty())
+        assert self.enemy_group.is_empty() is False
 
     def test_check_player_collision(self):
         """Test player collision detection."""
@@ -320,13 +514,9 @@ class TestEnemyGroup(unittest.TestCase):
         player_rect = pygame.Rect(400, 500, 30, 25)
 
         # Initially no collision
-        self.assertFalse(self.enemy_group.check_player_collision(player_rect))
+        assert self.enemy_group.check_player_collision(player_rect) is False
 
         # Move an enemy close to player
         enemy = list(self.enemy_group.enemies)[0]
         enemy.rect.bottom = player_rect.top - 30
-        self.assertTrue(self.enemy_group.check_player_collision(player_rect))
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert self.enemy_group.check_player_collision(player_rect) is True

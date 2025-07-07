@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "A neon-themed Space Invaders game with improved mechanics"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["pygame>=2.6.1", "numpy>=1.24.0"]
+dependencies = [
+    "pygame>=2.6.1",
+ "numpy>=1.24.0",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4.0", "pytest-cov>=4.1.0"]

@@ -1,28 +1,38 @@
-"""Test runner for Space Invaders game."""
+#!/usr/bin/env python
+"""Run the test suite using pytest."""
 
-import unittest
 import sys
+import subprocess
 import os
 
-# Add the project root to the Python path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+def main():
+    """Run pytest with appropriate arguments."""
+    # Ensure we're in the project root
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(project_root)
 
-def run_all_tests():
-    """Discover and run all tests."""
-    # Discover tests
-    loader = unittest.TestLoader()
-    start_dir = "tests"
-    suite = loader.discover(start_dir, pattern="test_*.py")
+    # Build pytest command
+    pytest_args = [
+        sys.executable,
+        "-m",
+        "pytest",
+    ]
 
-    # Run tests with verbose output
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
+    # Add any command line arguments passed to this script
+    if len(sys.argv) > 1:
+        pytest_args.extend(sys.argv[1:])
 
-    # Return exit code based on test results
-    return 0 if result.wasSuccessful() else 1
+    # Run pytest
+    print("Running tests with pytest...")
+    print(f"Command: {' '.join(pytest_args)}")
+    print("-" * 70)
+
+    result = subprocess.run(pytest_args)
+
+    # Exit with the same code as pytest
+    sys.exit(result.returncode)
 
 
 if __name__ == "__main__":
-    exit_code = run_all_tests()
-    sys.exit(exit_code)
+    main()

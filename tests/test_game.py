@@ -1,6 +1,6 @@
 """Unit tests for game logic and state management."""
 
-import unittest
+import pytest
 import pygame
 from unittest.mock import Mock, patch, MagicMock
 import sys
@@ -15,31 +15,35 @@ from config import *
 from entities import Player, Enemy, Bullet, Bonus
 
 
-class TestGame(unittest.TestCase):
+class TestGame:
     """Test cases for Game class."""
 
-    def setUp(self):
-        """Set up test fixtures."""
+    @pytest.fixture(autouse=True)
+    def setup_and_teardown(self):
+        """Set up test fixtures and clean up after tests."""
         pygame.init()
         self.game = Game()
-
-    def tearDown(self):
-        """Clean up after tests."""
-        # Remove any test highscore files
+        yield
+        # Clean up after tests
         if os.path.exists("highscore.json"):
             os.remove("highscore.json")
+        pygame.quit()
 
     def test_game_initialization(self):
         """Test game is initialized correctly."""
-        self.assertEqual(self.game.state, GameState.MENU)
-        self.assertTrue(self.game.running)
-        self.assertEqual(self.game.wave, 1)
-        self.assertIsNone(self.game.player)
+        assert self.game.state == GameState.MENU
+        assert self.game.running is True
+        assert self.game.wave == 1
+        assert self.game.player is None
+        assert self.game.sound_enabled == SOUND_ENABLED
+        assert self.game.sound_volume == SOUND_VOLUME
+        assert self.game.show_fps is False
+        assert self.game.difficulty == "Normal"
 
     def test_load_high_score_no_file(self):
         """Test loading high score when no file exists."""
         score = self.game.load_high_score()
-        self.assertEqual(score, 0)
+        assert score == 0
 
     def test_save_and_load_high_score(self):
         """Test saving and loading high score."""
@@ -53,7 +57,7 @@ class TestGame(unittest.TestCase):
 
         # Load it back
         loaded_score = self.game.load_high_score()
-        self.assertEqual(loaded_score, 1000)
+        assert loaded_score == 1000
 
     def test_reset_game(self):
         """Test game reset functionality."""
@@ -65,11 +69,11 @@ class TestGame(unittest.TestCase):
         self.game.reset_game()
 
         # Check everything is cleared and reset
-        self.assertIsNotNone(self.game.player)
-        self.assertEqual(len(self.game.player_bullets), 0)
-        self.assertEqual(len(self.game.bonuses), 0)
-        self.assertEqual(self.game.wave, 1)
-        self.assertEqual(len(self.game.enemy_group.enemies), ENEMY_ROWS * ENEMY_COLS)
+        assert self.game.player is not None
+        assert len(self.game.player_bullets) == 0
+        assert len(self.game.bonuses) == 0
+        assert self.game.wave == 1
+        assert len(self.game.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
 
     def test_state_transitions_menu_to_playing(self):
         """Test transition from menu to playing."""
@@ -80,8 +84,21 @@ class TestGame(unittest.TestCase):
         pygame.event.post(event)
 
         self.game.handle_events()
-        self.assertEqual(self.game.state, GameState.PLAYING)
-        self.assertIsNotNone(self.game.player)
+        assert self.game.state == GameState.PLAYING
+        assert self.game.player is not None
+
+    def test_state_transitions_menu_to_settings(self):
+        """Test transition from menu to settings."""
+        self.game.state = GameState.MENU
+
+        # Simulate S key press
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_s})
+        pygame.event.post(event)
+
+        self.game.handle_events()
+        assert self.game.state == GameState.SETTINGS
+        assert hasattr(self.game, "selected_setting")
+        assert self.game.selected_setting == 0
 
     def test_state_transitions_playing_to_paused(self):
         """Test transition from playing to paused."""
@@ -93,18 +110,23 @@ class TestGame(unittest.TestCase):
         pygame.event.post(event)
 
         self.game.handle_events()
-        self.assertEqual(self.game.state, GameState.PAUSED)
+        assert self.game.state == GameState.PAUSED
 
     def test_player_shoot(self):
         """Test player shooting mechanism."""
         self.game.reset_game()
         initial_bullets = len(self.game.player_bullets)
 
-        # Mock time
+        # Mock time and sound
         with patch("pygame.time.get_ticks", return_value=1000):
-            self.game.player_shoot()
+            with (
+                patch.object(self.game._sound_manager, "play")
+                if hasattr(self.game, "_sound_manager")
+                else patch("sounds.sound_manager.play")
+            ):
+                self.game.player_shoot()
 
-        self.assertEqual(len(self.game.player_bullets), initial_bullets + 1)
+        assert len(self.game.player_bullets) == initial_bullets + 1
 
     def test_enemy_shoot(self):
         """Test enemy shooting mechanism."""
@@ -113,10 +135,11 @@ class TestGame(unittest.TestCase):
 
         # Mock random to ensure at least one enemy shoots
         with patch("random.random", return_value=0.0001):
-            self.game.enemy_shoot()
+            with patch("sounds.sound_manager.play"):
+                self.game.enemy_shoot()
 
         # At least one enemy should have shot
-        self.assertGreater(len(self.game.enemy_bullets), initial_bullets)
+        assert len(self.game.enemy_bullets) > initial_bullets
 
     def test_check_collisions_player_bullet_hits_enemy(self):
         """Test collision detection for player bullets hitting enemies."""
@@ -133,13 +156,14 @@ class TestGame(unittest.TestCase):
         initial_score = self.game.player.score
         initial_enemies = len(self.game.enemy_group.enemies)
 
-        # Check collisions
-        self.game.check_collisions()
+        # Check collisions with mocked sound
+        with patch("sounds.sound_manager.play"):
+            self.game.check_collisions()
 
         # Enemy should be destroyed and score increased
-        self.assertEqual(len(self.game.enemy_group.enemies), initial_enemies - 1)
-        self.assertEqual(self.game.player.score, initial_score + ENEMY_SCORE)
-        self.assertEqual(len(self.game.player_bullets), 0)  # Bullet removed
+        assert len(self.game.enemy_group.enemies) == initial_enemies - 1
+        assert self.game.player.score == initial_score + ENEMY_SCORE
+        assert len(self.game.player_bullets) == 0  # Bullet removed
 
     def test_check_collisions_enemy_bullet_hits_player(self):
         """Test collision detection for enemy bullets hitting player."""
@@ -153,12 +177,13 @@ class TestGame(unittest.TestCase):
 
         initial_lives = self.game.player.lives
 
-        # Check collisions
-        self.game.check_collisions()
+        # Check collisions with mocked sound
+        with patch("sounds.sound_manager.play"):
+            self.game.check_collisions()
 
         # Player should lose a life
-        self.assertEqual(self.game.player.lives, initial_lives - 1)
-        self.assertEqual(len(self.game.enemy_bullets), 0)  # Bullet removed
+        assert self.game.player.lives == initial_lives - 1
+        assert len(self.game.enemy_bullets) == 0  # Bullet removed
 
     def test_check_collisions_player_collects_bonus(self):
         """Test collision detection for player collecting bonuses."""
@@ -170,12 +195,13 @@ class TestGame(unittest.TestCase):
 
         initial_score = self.game.player.score
 
-        # Check collisions
-        self.game.check_collisions()
+        # Check collisions with mocked sound
+        with patch("sounds.sound_manager.play"):
+            self.game.check_collisions()
 
         # Player should get bonus score
-        self.assertEqual(self.game.player.score, initial_score + BONUS_SCORE)
-        self.assertEqual(len(self.game.bonuses), 0)  # Bonus removed
+        assert self.game.player.score == initial_score + BONUS_SCORE
+        assert len(self.game.bonuses) == 0  # Bonus removed
 
     def test_game_over_no_lives(self):
         """Test game over when player has no lives."""
@@ -183,9 +209,10 @@ class TestGame(unittest.TestCase):
         self.game.state = GameState.PLAYING  # Ensure we're in playing state
         self.game.player.lives = 0
 
-        self.game.update()
+        with patch("sounds.sound_manager.play"):
+            self.game.update()
 
-        self.assertEqual(self.game.state, GameState.GAME_OVER)
+        assert self.game.state == GameState.GAME_OVER
 
     def test_game_over_enemies_reach_player(self):
         """Test game over when enemies reach player."""
@@ -196,10 +223,11 @@ class TestGame(unittest.TestCase):
         enemy = list(self.game.enemy_group.enemies)[0]
         enemy.rect.bottom = self.game.player.rect.top - 30
 
-        self.game.update()
+        with patch("sounds.sound_manager.play"):
+            self.game.update()
 
-        self.assertEqual(self.game.state, GameState.GAME_OVER)
-        self.assertEqual(self.game.player.lives, 0)
+        assert self.game.state == GameState.GAME_OVER
+        assert self.game.player.lives == 0
 
     def test_wave_clear(self):
         """Test wave clear when all enemies defeated."""
@@ -210,10 +238,11 @@ class TestGame(unittest.TestCase):
         # Clear all enemies
         self.game.enemy_group.enemies.empty()
 
-        self.game.update()
+        with patch("sounds.sound_manager.play"):
+            self.game.update()
 
-        self.assertEqual(self.game.state, GameState.WAVE_CLEAR)
-        self.assertEqual(self.game.player.score, initial_score + WAVE_CLEAR_BONUS)
+        assert self.game.state == GameState.WAVE_CLEAR
+        assert self.game.player.score == initial_score + WAVE_CLEAR_BONUS
 
     def test_next_wave(self):
         """Test progression to next wave."""
@@ -222,9 +251,20 @@ class TestGame(unittest.TestCase):
 
         self.game.next_wave()
 
-        self.assertEqual(self.game.wave, 2)
-        self.assertEqual(len(self.game.enemy_group.enemies), ENEMY_ROWS * ENEMY_COLS)
-        self.assertEqual(self.game.state, GameState.PLAYING)
+        assert self.game.wave == 2
+        assert len(self.game.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
+        assert self.game.state == GameState.PLAYING
+
+    def test_get_difficulty_modifier(self):
+        """Test difficulty modifier calculation."""
+        self.game.difficulty = "Easy"
+        assert self.game.get_difficulty_modifier() == 0.7
+
+        self.game.difficulty = "Normal"
+        assert self.game.get_difficulty_modifier() == 1.0
+
+        self.game.difficulty = "Hard"
+        assert self.game.get_difficulty_modifier() == 1.5
 
     @patch("random.random")
     def test_bonus_spawn_on_enemy_kill(self, mock_random):
@@ -244,20 +284,24 @@ class TestGame(unittest.TestCase):
 
         initial_bonuses = len(self.game.bonuses)
 
-        # Check collisions
-        self.game.check_collisions()
+        # Check collisions with mocked sound
+        with patch("sounds.sound_manager.play"):
+            self.game.check_collisions()
 
         # Bonus should be spawned
-        self.assertEqual(len(self.game.bonuses), initial_bonuses + 1)
+        assert len(self.game.bonuses) == initial_bonuses + 1
 
 
-class TestGameStates(unittest.TestCase):
+class TestGameStates:
     """Test cases for game state management."""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures."""
         pygame.init()
         self.game = Game()
+        yield
+        pygame.quit()
 
     def test_menu_state_escape_quits(self):
         """Test escape key quits from menu."""
@@ -268,7 +312,7 @@ class TestGameStates(unittest.TestCase):
         pygame.event.post(event)
 
         self.game.handle_events()
-        self.assertFalse(self.game.running)
+        assert self.game.running is False
 
     def test_paused_state_resume(self):
         """Test resuming from paused state."""
@@ -278,7 +322,7 @@ class TestGameStates(unittest.TestCase):
         pygame.event.post(event)
 
         self.game.handle_events()
-        self.assertEqual(self.game.state, GameState.PLAYING)
+        assert self.game.state == GameState.PLAYING
 
     def test_paused_state_quit_to_menu(self):
         """Test quitting to menu from paused state."""
@@ -288,7 +332,7 @@ class TestGameStates(unittest.TestCase):
         pygame.event.post(event)
 
         self.game.handle_events()
-        self.assertEqual(self.game.state, GameState.MENU)
+        assert self.game.state == GameState.MENU
 
     def test_game_over_continue(self):
         """Test continuing from game over state."""
@@ -298,7 +342,7 @@ class TestGameStates(unittest.TestCase):
         pygame.event.post(event)
 
         self.game.handle_events()
-        self.assertEqual(self.game.state, GameState.MENU)
+        assert self.game.state == GameState.MENU
 
     def test_wave_clear_continue(self):
         """Test continuing from wave clear state."""
@@ -309,45 +353,147 @@ class TestGameStates(unittest.TestCase):
         pygame.event.post(event)
 
         self.game.handle_events()
-        self.assertEqual(self.game.wave, 2)
-        self.assertEqual(self.game.state, GameState.PLAYING)
+        assert self.game.wave == 2
+        assert self.game.state == GameState.PLAYING
 
 
-class TestGameIntegration(unittest.TestCase):
-    """Integration tests for game flow."""
+class TestSettingsMenu:
+    """Test cases for settings menu functionality."""
 
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures."""
         pygame.init()
         self.game = Game()
+        self.game.state = GameState.SETTINGS
+        self.game.selected_setting = 0
+        yield
+        pygame.quit()
+
+    def test_settings_navigation_up(self):
+        """Test navigating up in settings menu."""
+        self.game.selected_setting = 2
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_UP})
+        pygame.event.post(event)
+
+        self.game.handle_events()
+        assert self.game.selected_setting == 1
+
+    def test_settings_navigation_down(self):
+        """Test navigating down in settings menu."""
+        self.game.selected_setting = 1
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_DOWN})
+        pygame.event.post(event)
+
+        self.game.handle_events()
+        assert self.game.selected_setting == 2
+
+    def test_settings_sound_toggle(self):
+        """Test toggling sound on/off."""
+        initial_sound = self.game.sound_enabled
+        self.game.selected_setting = 0
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_LEFT})
+        pygame.event.post(event)
+
+        self.game.handle_events()
+        assert self.game.sound_enabled != initial_sound
+
+    def test_settings_volume_adjustment(self):
+        """Test adjusting volume."""
+        self.game.selected_setting = 1
+        self.game.sound_volume = 0.5
+
+        # Test volume increase
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RIGHT})
+        pygame.event.post(event)
+        self.game.handle_events()
+        assert self.game.sound_volume == 0.6
+
+        # Test volume decrease
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_LEFT})
+        pygame.event.post(event)
+        self.game.handle_events()
+        assert self.game.sound_volume == 0.5
+
+    def test_settings_fps_toggle(self):
+        """Test toggling FPS display."""
+        initial_fps = self.game.show_fps
+        self.game.selected_setting = 2
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RIGHT})
+        pygame.event.post(event)
+
+        self.game.handle_events()
+        assert self.game.show_fps != initial_fps
+
+    def test_settings_difficulty_change(self):
+        """Test changing difficulty."""
+        self.game.selected_setting = 3
+        self.game.difficulty = "Normal"
+
+        # Test changing to Hard
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RIGHT})
+        pygame.event.post(event)
+        self.game.handle_events()
+        assert self.game.difficulty == "Hard"
+
+        # Test changing to Easy
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_LEFT})
+        pygame.event.post(event)
+        self.game.handle_events()
+        assert self.game.difficulty == "Normal"
+
+    def test_settings_escape_to_menu(self):
+        """Test returning to menu from settings."""
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_ESCAPE})
+        pygame.event.post(event)
+
+        self.game.handle_events()
+        assert self.game.state == GameState.MENU
+
+
+class TestGameIntegration:
+    """Integration tests for game flow."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Set up test fixtures."""
+        pygame.init()
+        self.game = Game()
+        yield
+        pygame.quit()
 
     def test_full_game_flow(self):
         """Test complete game flow from menu to game over."""
         # Start at menu
-        self.assertEqual(self.game.state, GameState.MENU)
+        assert self.game.state == GameState.MENU
 
         # Start game
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
         pygame.event.post(event)
         self.game.handle_events()
 
-        self.assertEqual(self.game.state, GameState.PLAYING)
-        self.assertIsNotNone(self.game.player)
+        assert self.game.state == GameState.PLAYING
+        assert self.game.player is not None
 
         # Simulate player losing all lives
         self.game.player.lives = 1
         self.game.player.hit()
 
         # Update should detect game over
-        self.game.update()
-        self.assertEqual(self.game.state, GameState.GAME_OVER)
+        with patch("sounds.sound_manager.play"):
+            self.game.update()
+        assert self.game.state == GameState.GAME_OVER
 
         # Return to menu
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
         pygame.event.post(event)
         self.game.handle_events()
 
-        self.assertEqual(self.game.state, GameState.MENU)
+        assert self.game.state == GameState.MENU
 
     def test_wave_progression(self):
         """Test progressing through multiple waves."""
@@ -357,18 +503,15 @@ class TestGameIntegration(unittest.TestCase):
 
         # Clear first wave
         self.game.enemy_group.enemies.empty()
-        self.game.update()
-        self.assertEqual(self.game.state, GameState.WAVE_CLEAR)
+        with patch("sounds.sound_manager.play"):
+            self.game.update()
+        assert self.game.state == GameState.WAVE_CLEAR
 
         # Continue to wave 2
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
         pygame.event.post(event)
         self.game.handle_events()
 
-        self.assertEqual(self.game.wave, 2)
-        self.assertEqual(self.game.state, GameState.PLAYING)
-        self.assertEqual(len(self.game.enemy_group.enemies), ENEMY_ROWS * ENEMY_COLS)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        assert self.game.wave == 2
+        assert self.game.state == GameState.PLAYING
+        assert len(self.game.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
