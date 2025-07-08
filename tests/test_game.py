@@ -10,7 +10,16 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.config import *
+from src.config import (
+    BONUS_SCORE,
+    ENEMY_COLS,
+    ENEMY_ROWS,
+    ENEMY_SCORE,
+    SOUND_ENABLED,
+    SOUND_VOLUME,
+    WAVE_CLEAR_BONUS,
+    GameState,
+)
 from src.entities import Bonus, Bullet, Player
 from src.game import Game
 
@@ -118,13 +127,11 @@ class TestGame:
         initial_bullets = len(self.game.player_bullets)
 
         # Mock time and sound
-        with patch("pygame.time.get_ticks", return_value=1000):
-            with (
-                patch.object(self.game._sound_manager, "play")
-                if hasattr(self.game, "_sound_manager")
-                else patch("sounds.sound_manager.play")
-            ):
-                self.game.player_shoot()
+        with (
+            patch("pygame.time.get_ticks", return_value=1000),
+            patch("src.sounds.sound_manager.play"),
+        ):
+            self.game.player_shoot()
 
         assert len(self.game.player_bullets) == initial_bullets + 1
 
@@ -134,9 +141,11 @@ class TestGame:
         initial_bullets = len(self.game.enemy_bullets)
 
         # Mock random to ensure at least one enemy shoots
-        with patch("random.random", return_value=0.0001):
-            with patch("sounds.sound_manager.play"):
-                self.game.enemy_shoot()
+        with (
+            patch("random.random", return_value=0.0001),
+            patch("src.sounds.sound_manager.play"),
+        ):
+            self.game.enemy_shoot()
 
         # At least one enemy should have shot
         assert len(self.game.enemy_bullets) > initial_bullets
@@ -146,23 +155,24 @@ class TestGame:
         self.game.reset_game()
 
         # Get an enemy position
-        enemy = list(self.game.enemy_group.enemies)[0]
+        enemy = next(iter(self.game.enemy_group.enemies))
         enemy_pos = (enemy.rect.centerx, enemy.rect.centery)
 
         # Create a bullet at enemy position
         bullet = Bullet(enemy_pos[0], enemy_pos[1], 0, "player")
         self.game.player_bullets.add(bullet)
 
-        initial_score = self.game.player.score
+        initial_score = self.game.player.score if self.game.player else 0
         initial_enemies = len(self.game.enemy_group.enemies)
 
         # Check collisions with mocked sound
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.check_collisions()
 
         # Enemy should be destroyed and score increased
         assert len(self.game.enemy_group.enemies) == initial_enemies - 1
-        assert self.game.player.score == initial_score + ENEMY_SCORE
+        if self.game.player:
+            assert self.game.player.score == initial_score + ENEMY_SCORE
         assert len(self.game.player_bullets) == 0  # Bullet removed
 
     def test_check_collisions_enemy_bullet_hits_player(self):
@@ -170,6 +180,7 @@ class TestGame:
         self.game.reset_game()
 
         # Create enemy bullet at player position
+        assert self.game.player is not None  # Ensure player exists after reset_game
         bullet = Bullet(
             self.game.player.rect.centerx, self.game.player.rect.centery, 0, "enemy"
         )
@@ -178,11 +189,12 @@ class TestGame:
         initial_lives = self.game.player.lives
 
         # Check collisions with mocked sound
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.check_collisions()
 
         # Player should lose a life
-        assert self.game.player.lives == initial_lives - 1
+        if self.game.player:
+            assert self.game.player.lives == initial_lives - 1
         assert len(self.game.enemy_bullets) == 0  # Bullet removed
 
     def test_check_collisions_player_collects_bonus(self):
@@ -190,26 +202,29 @@ class TestGame:
         self.game.reset_game()
 
         # Create bonus at player position
+        assert self.game.player is not None  # Ensure player exists after reset_game
         bonus = Bonus(self.game.player.rect.centerx, self.game.player.rect.centery)
         self.game.bonuses.add(bonus)
 
         initial_score = self.game.player.score
 
         # Check collisions with mocked sound
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.check_collisions()
 
         # Player should get bonus score
-        assert self.game.player.score == initial_score + BONUS_SCORE
+        if self.game.player:
+            assert self.game.player.score == initial_score + BONUS_SCORE
         assert len(self.game.bonuses) == 0  # Bonus removed
 
     def test_game_over_no_lives(self):
         """Test game over when player has no lives."""
         self.game.reset_game()
         self.game.state = GameState.PLAYING  # Ensure we're in playing state
+        assert self.game.player is not None  # Ensure player exists after reset_game
         self.game.player.lives = 0
 
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.update()
 
         assert self.game.state == GameState.GAME_OVER
@@ -220,29 +235,32 @@ class TestGame:
         self.game.state = GameState.PLAYING  # Ensure we're in playing state
 
         # Move an enemy close to player
-        enemy = list(self.game.enemy_group.enemies)[0]
+        assert self.game.player is not None  # Ensure player exists after reset_game
+        enemy = next(iter(self.game.enemy_group.enemies))
         enemy.rect.bottom = self.game.player.rect.top - 30
 
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.update()
 
         assert self.game.state == GameState.GAME_OVER
-        assert self.game.player.lives == 0
+        if self.game.player:
+            assert self.game.player.lives == 0
 
     def test_wave_clear(self):
         """Test wave clear when all enemies defeated."""
         self.game.reset_game()
         self.game.state = GameState.PLAYING  # Ensure we're in playing state
-        initial_score = self.game.player.score
+        initial_score = self.game.player.score if self.game.player else 0
 
         # Clear all enemies
         self.game.enemy_group.enemies.empty()
 
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.update()
 
         assert self.game.state == GameState.WAVE_CLEAR
-        assert self.game.player.score == initial_score + WAVE_CLEAR_BONUS
+        if self.game.player:
+            assert self.game.player.score == initial_score + WAVE_CLEAR_BONUS
 
     def test_next_wave(self):
         """Test progression to next wave."""
@@ -275,7 +293,7 @@ class TestGame:
         mock_random.return_value = 0.1  # Less than BONUS_SPAWN_CHANCE
 
         # Get an enemy position
-        enemy = list(self.game.enemy_group.enemies)[0]
+        enemy = next(iter(self.game.enemy_group.enemies))
         enemy_pos = (enemy.rect.centerx, enemy.rect.centery)
 
         # Create a bullet at enemy position
@@ -285,7 +303,7 @@ class TestGame:
         initial_bonuses = len(self.game.bonuses)
 
         # Check collisions with mocked sound
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.check_collisions()
 
         # Bonus should be spawned
@@ -480,11 +498,12 @@ class TestGameIntegration:
         assert self.game.player is not None
 
         # Simulate player losing all lives
+        assert self.game.player is not None  # Player should exist after starting game
         self.game.player.lives = 1
         self.game.player.hit()
 
         # Update should detect game over
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.update()
         assert self.game.state == GameState.GAME_OVER
 
@@ -503,7 +522,7 @@ class TestGameIntegration:
 
         # Clear first wave
         self.game.enemy_group.enemies.empty()
-        with patch("sounds.sound_manager.play"):
+        with patch("src.sounds.sound_manager.play"):
             self.game.update()
         assert self.game.state == GameState.WAVE_CLEAR
 

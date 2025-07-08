@@ -35,8 +35,6 @@ class SoundManager:
 
     def play(self, sound_name: str):
         """Play a sound by name."""
-        from .config import SOUND_ENABLED
-
         if not SOUND_ENABLED:
             return
 
@@ -64,7 +62,7 @@ class SoundManager:
         attack: float = 0.01,
         decay: float = 0.1,
         sustain: float = 0.3,
-        release: float = 0.2,
+        release: float = 0.2,  # noqa: ARG002
     ) -> np.ndarray:
         """Apply ADSR envelope to sound."""
         total_frames = len(sound)
@@ -188,7 +186,6 @@ class SoundManager:
 
         # Three note ascending arpeggio
         note_duration = duration / 3
-        t1 = np.linspace(0, note_duration, int(sample_rate * note_duration))
 
         # C, E, G notes
         note1 = self._generate_tone(523.25, note_duration, sample_rate)  # C5

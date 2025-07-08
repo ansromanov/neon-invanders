@@ -69,7 +69,8 @@ class Game:
             if os.path.exists("highscore.json"):
                 with open("highscore.json") as f:
                     data = json.load(f)
-                    return data.get("high_score", 0)
+                    score = data.get("high_score", 0)
+                    return int(score) if isinstance(score, int | float) else 0
         except:
             pass
         return 0
@@ -181,7 +182,8 @@ class Game:
 
         # Update player with keyboard input
         keys = pygame.key.get_pressed()
-        self.player.update(keys)
+        if self.player:
+            self.player.update(keys)
 
         # Update all other sprites
         self.enemy_group.update()
@@ -197,22 +199,23 @@ class Game:
         self.check_collisions()
 
         # Check game over conditions
-        if not self.player.is_alive():
-            self.state = GameState.GAME_OVER
-            self.save_high_score()
-            # Play game over sound
-            sound_manager.play("game_over")
-        elif self.enemy_group.check_player_collision(self.player.rect):
-            self.player.lives = 0
-            self.state = GameState.GAME_OVER
-            self.save_high_score()
-            # Play game over sound
-            sound_manager.play("game_over")
-        elif self.enemy_group.is_empty():
-            self.state = GameState.WAVE_CLEAR
-            self.player.score += WAVE_CLEAR_BONUS
-            # Play wave clear sound
-            sound_manager.play("wave_clear")
+        if self.player:
+            if not self.player.is_alive():
+                self.state = GameState.GAME_OVER
+                self.save_high_score()
+                # Play game over sound
+                sound_manager.play("game_over")
+            elif self.enemy_group.check_player_collision(self.player.rect):
+                self.player.lives = 0
+                self.state = GameState.GAME_OVER
+                self.save_high_score()
+                # Play game over sound
+                sound_manager.play("game_over")
+            elif self.enemy_group.is_empty():
+                self.state = GameState.WAVE_CLEAR
+                self.player.score += WAVE_CLEAR_BONUS
+                # Play wave clear sound
+                sound_manager.play("wave_clear")
 
     def check_collisions(self):
         """Check all game collisions."""
@@ -224,7 +227,8 @@ class Game:
             if hit_enemies:
                 bullet.kill()
                 for enemy in hit_enemies:
-                    self.player.score += ENEMY_SCORE
+                    if self.player:
+                        self.player.score += ENEMY_SCORE
                     explosion = Explosion(enemy.rect.centerx, enemy.rect.centery)
                     self.explosions.add(explosion)
                     self.all_sprites.add(explosion)
@@ -238,54 +242,63 @@ class Game:
                         self.all_sprites.add(bonus)
 
         # Enemy bullets hitting player
-        hit_player = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
-        if hit_player:
-            if self.player.shield_active:
-                # Play shield hit sound
-                sound_manager.play("shield_hit")
-            else:
-                # Play explosion sound
-                sound_manager.play("explosion")
-            self.player.hit()
-            explosion = Explosion(self.player.rect.centerx, self.player.rect.centery)
-            self.explosions.add(explosion)
-            self.all_sprites.add(explosion)
+        if self.player:
+            hit_player = pygame.sprite.spritecollide(
+                self.player, self.enemy_bullets, True
+            )
+            if hit_player:
+                if self.player.shield_active:
+                    # Play shield hit sound
+                    sound_manager.play("shield_hit")
+                else:
+                    # Play explosion sound
+                    sound_manager.play("explosion")
+                self.player.hit()
+                explosion = Explosion(
+                    self.player.rect.centerx, self.player.rect.centery
+                )
+                self.explosions.add(explosion)
+                self.all_sprites.add(explosion)
 
         # Player collecting bonuses
-        collected_bonuses = pygame.sprite.spritecollide(self.player, self.bonuses, True)
-        for bonus in collected_bonuses:
-            self.apply_bonus_effect(bonus.shape_type)
-            # Play bonus collection sound
-            sound_manager.play("bonus_collect")
+        if self.player:
+            collected_bonuses = pygame.sprite.spritecollide(
+                self.player, self.bonuses, True
+            )
+            for bonus in collected_bonuses:
+                self.apply_bonus_effect(bonus.shape_type)
+                # Play bonus collection sound
+                sound_manager.play("bonus_collect")
 
     def apply_bonus_effect(self, bonus_type: int):
         """Apply bonus effect based on Tetris block type."""
         current_time = pygame.time.get_ticks()
 
-        if bonus_type == BonusType.EXTRA_LIFE:
-            # O-block (cyan) - add 1 life
-            self.player.add_life()
-            self.player.score += BONUS_SCORE
+        if self.player:
+            if bonus_type == BonusType.EXTRA_LIFE:
+                # O-block (cyan) - add 1 life
+                self.player.add_life()
+                self.player.score += BONUS_SCORE
 
-        elif bonus_type == BonusType.FREEZE_ENEMIES:
-            # T-block (yellow) - freeze enemies for 5 seconds
-            self.enemy_group.freeze(FREEZE_DURATION)
-            self.player.score += BONUS_SCORE
+            elif bonus_type == BonusType.FREEZE_ENEMIES:
+                # T-block (yellow) - freeze enemies for 5 seconds
+                self.enemy_group.freeze(FREEZE_DURATION)
+                self.player.score += BONUS_SCORE
 
-        elif bonus_type == BonusType.TRIPLE_SHOT:
-            # I-block (purple) - triple shot
-            self.player.activate_triple_shot()
-            self.player.score += BONUS_SCORE
+            elif bonus_type == BonusType.TRIPLE_SHOT:
+                # I-block (purple) - triple shot
+                self.player.activate_triple_shot()
+                self.player.score += BONUS_SCORE
 
-        elif bonus_type == BonusType.SHIELD:
-            # S-block (pink) - temporary shield
-            self.player.activate_shield(current_time)
-            self.player.score += BONUS_SCORE
+            elif bonus_type == BonusType.SHIELD:
+                # S-block (pink) - temporary shield
+                self.player.activate_shield(current_time)
+                self.player.score += BONUS_SCORE
 
-        elif bonus_type == BonusType.RAPID_FIRE:
-            # Z-block (green) - rapid fire
-            self.player.activate_rapid_fire(current_time)
-            self.player.score += BONUS_SCORE
+            elif bonus_type == BonusType.RAPID_FIRE:
+                # Z-block (green) - rapid fire
+                self.player.activate_rapid_fire(current_time)
+                self.player.score += BONUS_SCORE
 
         # Play power-up sound for all bonus types
         sound_manager.play("power_up")
@@ -372,33 +385,39 @@ class Game:
         self.all_sprites.draw(self.screen)
 
         # Draw UI
-        score_text = self.font.render(f"Score: {self.player.score}", True, NEON_GREEN)
-        self.screen.blit(score_text, (10, 10))
+        if self.player:
+            score_text = self.font.render(
+                f"Score: {self.player.score}", True, NEON_GREEN
+            )
+            self.screen.blit(score_text, (10, 10))
 
-        lives_text = self.font.render(f"Lives: {self.player.lives}", True, NEON_CYAN)
-        self.screen.blit(lives_text, (10, 50))
+            lives_text = self.font.render(
+                f"Lives: {self.player.lives}", True, NEON_CYAN
+            )
+            self.screen.blit(lives_text, (10, 50))
 
         wave_text = self.font.render(f"Wave: {self.wave}", True, NEON_YELLOW)
         self.screen.blit(wave_text, (SCREEN_WIDTH - 150, 10))
 
         # Draw active bonuses
         y_offset = 90
-        if self.player.shield_active:
-            shield_text = self.font.render("SHIELD ACTIVE", True, NEON_PINK)
-            self.screen.blit(shield_text, (10, y_offset))
-            y_offset += 30
+        if self.player:
+            if self.player.shield_active:
+                shield_text = self.font.render("SHIELD ACTIVE", True, NEON_PINK)
+                self.screen.blit(shield_text, (10, y_offset))
+                y_offset += 30
 
-        if self.player.rapid_fire_active:
-            rapid_text = self.font.render("RAPID FIRE", True, NEON_GREEN)
-            self.screen.blit(rapid_text, (10, y_offset))
-            y_offset += 30
+            if self.player.rapid_fire_active:
+                rapid_text = self.font.render("RAPID FIRE", True, NEON_GREEN)
+                self.screen.blit(rapid_text, (10, y_offset))
+                y_offset += 30
 
         if self.enemy_group.frozen:
             freeze_text = self.font.render("ENEMIES FROZEN", True, NEON_YELLOW)
             self.screen.blit(freeze_text, (10, y_offset))
 
         # Draw shield visual effect
-        if self.player.shield_active:
+        if self.player and self.player.shield_active:
             pygame.draw.circle(
                 self.screen,
                 (*NEON_CYAN, 100),
@@ -454,23 +473,26 @@ class Game:
         self.screen.blit(game_over_text, game_over_rect)
 
         # Final score
-        score_text = self.font.render(
-            f"Final Score: {self.player.score}", True, NEON_YELLOW
-        )
-        score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
-        self.screen.blit(score_text, score_rect)
-
-        # High score
-        if self.player.score > self.high_score:
-            new_high_text = self.font.render("NEW HIGH SCORE!", True, NEON_GREEN)
-            new_high_rect = new_high_text.get_rect(center=(SCREEN_WIDTH // 2, 300))
-            self.screen.blit(new_high_text, new_high_rect)
-        else:
-            high_score_text = self.font.render(
-                f"High Score: {self.high_score}", True, NEON_CYAN
+        if self.player:
+            score_text = self.font.render(
+                f"Final Score: {self.player.score}", True, NEON_YELLOW
             )
-            high_score_rect = high_score_text.get_rect(center=(SCREEN_WIDTH // 2, 300))
-            self.screen.blit(high_score_text, high_score_rect)
+            score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
+            self.screen.blit(score_text, score_rect)
+
+            # High score
+            if self.player.score > self.high_score:
+                new_high_text = self.font.render("NEW HIGH SCORE!", True, NEON_GREEN)
+                new_high_rect = new_high_text.get_rect(center=(SCREEN_WIDTH // 2, 300))
+                self.screen.blit(new_high_text, new_high_rect)
+            else:
+                high_score_text = self.font.render(
+                    f"High Score: {self.high_score}", True, NEON_CYAN
+                )
+                high_score_rect = high_score_text.get_rect(
+                    center=(SCREEN_WIDTH // 2, 300)
+                )
+                self.screen.blit(high_score_text, high_score_rect)
 
         # Continue text
         continue_text = self.font.render("Press SPACE to Continue", True, NEON_PURPLE)

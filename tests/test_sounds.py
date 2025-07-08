@@ -100,7 +100,10 @@ class TestSoundManager:
     @patch("pygame.mixer.set_num_channels")
     @patch("pygame.sndarray.make_sound")
     def test_play_existing_sound_enabled(
-        self, mock_make_sound, mock_set_channels, mock_mixer_init
+        self,
+        mock_make_sound,
+        mock_set_channels,  # noqa: ARG002
+        mock_mixer_init,  # noqa: ARG002
     ):
         """Test playing an existing sound when enabled."""
         mock_sound = MagicMock()
@@ -133,7 +136,10 @@ class TestSoundManager:
     @patch("pygame.mixer.set_num_channels")
     @patch("pygame.sndarray.make_sound")
     def test_play_non_existing_sound(
-        self, mock_make_sound, mock_set_channels, mock_mixer_init
+        self,
+        mock_make_sound,
+        mock_set_channels,  # noqa: ARG002
+        mock_mixer_init,  # noqa: ARG002
     ):
         """Test playing a non-existing sound doesn't crash."""
         mock_sound = MagicMock()
@@ -161,7 +167,8 @@ class TestSoundManager:
         assert len(tone) == expected_frames
 
         # Check it's a sine wave (values between -1 and 1)
-        assert np.all(tone >= -1) and np.all(tone <= 1)
+        assert np.all(tone >= -1)
+        assert np.all(tone <= 1)
 
     def test_generate_noise(self):
         """Test noise generation."""
@@ -361,4 +368,4 @@ class TestSoundManager:
 
         # The sound_manager should exist
         assert hasattr(sounds, "sound_manager")
-        assert isinstance(sounds.sound_manager, (SoundManager, MagicMock))
+        assert isinstance(sounds.sound_manager, SoundManager | MagicMock)

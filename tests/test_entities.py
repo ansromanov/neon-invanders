@@ -10,7 +10,24 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.config import *
+from src.config import (
+    BONUS_FALL_SPEED,
+    BONUS_SCORE,
+    BULLET_SPEED,
+    ENEMY_BULLET_SPEED,
+    ENEMY_COLS,
+    ENEMY_ROWS,
+    ENEMY_SPACING_X,
+    ENEMY_SPEED_X,
+    ENEMY_SPEED_Y,
+    PLAYER_LIVES,
+    PLAYER_SHOOT_COOLDOWN,
+    PLAYER_SPEED,
+    RAPID_FIRE_DURATION,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    SHIELD_DURATION,
+)
 from src.entities import (
     Bonus,
     Bullet,
@@ -117,7 +134,7 @@ class TestPlayer:
         assert self.player.rapid_fire_end_time == current_time + RAPID_FIRE_DURATION
 
         # Test faster shooting cooldown
-        bullets = self.player.shoot(current_time)
+        self.player.shoot(current_time)
         # With rapid fire, cooldown should be 1/3 of normal (250 // 3 = 83)
         rapid_cooldown = PLAYER_SHOOT_COOLDOWN // 3
         assert self.player.can_shoot(current_time + rapid_cooldown) is False
@@ -435,7 +452,7 @@ class TestEnemyGroup:
         """Test formation detects right edge."""
         self.enemy_group.create_formation(1)
         # Move an enemy to right edge
-        enemy = list(self.enemy_group.enemies)[0]
+        enemy = next(iter(self.enemy_group.enemies))
         enemy.rect.right = SCREEN_WIDTH - 5
         enemy.direction = 1
 
@@ -454,7 +471,7 @@ class TestEnemyGroup:
             enemy.direction = -1
 
         # Move an enemy to left edge
-        test_enemy = list(self.enemy_group.enemies)[0]
+        test_enemy = next(iter(self.enemy_group.enemies))
         test_enemy.rect.left = 5
 
         self.enemy_group.update()
@@ -475,7 +492,7 @@ class TestEnemyGroup:
         assert self.enemy_group.freeze_end_time == current_time + 5000
 
         # Test enemies don't move when frozen
-        enemy = list(self.enemy_group.enemies)[0]
+        enemy = next(iter(self.enemy_group.enemies))
         initial_x = enemy.rect.x
         self.enemy_group.update()
         assert enemy.rect.x == initial_x  # Should not move
@@ -518,6 +535,6 @@ class TestEnemyGroup:
         assert self.enemy_group.check_player_collision(player_rect) is False
 
         # Move an enemy close to player
-        enemy = list(self.enemy_group.enemies)[0]
+        enemy = next(iter(self.enemy_group.enemies))
         enemy.rect.bottom = player_rect.top - 30
         assert self.enemy_group.check_player_collision(player_rect) is True

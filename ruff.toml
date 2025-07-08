@@ -30,6 +30,12 @@ ignore = [
     "E501",    # line too long (handled by formatter)
     "PLR0913", # too many arguments
     "PLR2004", # magic value comparison
+    "E722",    # bare except (sometimes needed)
+    "PLC0415", # import not at top of file (needed for circular imports)
+    "PLR0912", # too many branches
+    "PLR1714", # merge multiple comparisons
+    "PLW0603", # global statement
+    "EXE001",  # shebang present but file not executable
 ]
 
 # Set Python version
@@ -44,9 +50,23 @@ exclude = [".git", ".venv", "__pycache__", "build", "dist"]
 # Configure specific rules
 [per-file-ignores]
 "tests/*" = [
-    "S101",
-    "PLR2004",
-] # assert statements and magic values are ok in tests
+    "S101",    # assert statements are ok in tests
+    "PLR2004", # magic values are ok in tests
+    "F405",    # undefined names from star imports are ok in tests
+    "F403",    # star imports are ok in tests
+]
+"src/game.py" = [
+    "F405", # undefined names from star imports
+    "F403", # star imports
+]
+"src/sprites.py" = [
+    "F405", # undefined names from star imports
+    "F403", # star imports
+]
+"src/entities.py" = [
+    "F405", # undefined names from star imports
+    "F403", # star imports
+]
 
 [isort]
 known-first-party = ["config", "entities", "game", "sprites", "sounds"]

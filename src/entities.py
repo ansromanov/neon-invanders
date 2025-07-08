@@ -39,7 +39,7 @@ class Player(pygame.sprite.Sprite):
     def shoot(self, current_time: int) -> list["Bullet"]:
         """Create bullets at player position."""
         self.last_shot_time = current_time
-        bullets = []
+        bullets: list[Bullet] = []
 
         if self.triple_shot_active:
             # Triple shot - triangular pattern
@@ -260,12 +260,14 @@ class EnemyGroup:
         self.frozen = False
         self.freeze_end_time = 0
 
-    def create_formation(self, wave: int = 1, difficulty_modifier: float = 1.0):
+    def create_formation(self, wave: int = 1, difficulty_modifier: float = 1.0):  # noqa: ARG002
         """Create the initial enemy formation."""
         self.enemies.empty()
-        speed_multiplier = (
-            1 + (wave - 1) * 0.2
-        ) * difficulty_modifier  # Increase speed each wave with difficulty
+        # Speed multiplier increases with wave and difficulty
+        # (currently not used, but preserved for future enhancements)
+        # speed_multiplier = (
+        #     1 + (wave - 1) * 0.2
+        # ) * difficulty_modifier
 
         for row in range(ENEMY_ROWS):
             for col in range(ENEMY_COLS):
@@ -304,7 +306,7 @@ class EnemyGroup:
     def get_bottom_enemies(self) -> list[Enemy]:
         """Get enemies that can shoot (bottom row of each column)."""
         # Group enemies by column
-        columns = {}
+        columns: dict[int, list[Enemy]] = {}
         for enemy in self.enemies:
             col = enemy.rect.centerx // ENEMY_SPACING_X
             if col not in columns:
@@ -326,10 +328,7 @@ class EnemyGroup:
 
     def check_player_collision(self, player_rect: pygame.Rect) -> bool:
         """Check if any enemy reached the player's position."""
-        for enemy in self.enemies:
-            if enemy.rect.bottom > player_rect.top - 50:
-                return True
-        return False
+        return any(enemy.rect.bottom > player_rect.top - 50 for enemy in self.enemies)
 
     def freeze(self, duration: int):
         """Freeze all enemies for specified duration."""
