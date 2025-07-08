@@ -103,8 +103,8 @@ class TestSoundManager:
     def test_play_existing_sound_enabled(
         self,
         mock_make_sound,
-        mock_set_channels,  # noqa: ARG002
-        mock_mixer_init,  # noqa: ARG002
+        mock_set_channels,
+        mock_mixer_init,
     ):
         """Test playing an existing sound when enabled."""
         mock_sound = MagicMock()
@@ -139,8 +139,8 @@ class TestSoundManager:
     def test_play_non_existing_sound(
         self,
         mock_make_sound,
-        mock_set_channels,  # noqa: ARG002
-        mock_mixer_init,  # noqa: ARG002
+        mock_set_channels,
+        mock_mixer_init,
     ):
         """Test playing a non-existing sound doesn't crash."""
         mock_sound = MagicMock()

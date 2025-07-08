@@ -1,5 +1,15 @@
 # Ruff configuration for AWS Retro Game Challenge
 
+# Set Python version
+target-version = "py311"
+
+# Set line length
+line-length = 88
+
+# Exclude files and directories
+exclude = [".git", ".venv", "__pycache__", "build", "dist"]
+
+[lint]
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default
 select = [
     "E",   # pycodestyle errors
@@ -38,22 +48,14 @@ ignore = [
     "EXE001",  # shebang present but file not executable
 ]
 
-# Set Python version
-target-version = "py311"
-
-# Set line length
-line-length = 88
-
-# Exclude files and directories
-exclude = [".git", ".venv", "__pycache__", "build", "dist"]
-
 # Configure specific rules
-[per-file-ignores]
+[lint.per-file-ignores]
 "tests/*" = [
     "S101",    # assert statements are ok in tests
     "PLR2004", # magic values are ok in tests
     "F405",    # undefined names from star imports are ok in tests
     "F403",    # star imports are ok in tests
+    "ARG002",  # unused arguments are ok in tests (e.g., fixtures)
 ]
 "src/game.py" = [
     "F405", # undefined names from star imports
@@ -71,13 +73,13 @@ exclude = [".git", ".venv", "__pycache__", "build", "dist"]
     "PLR0915", # too many statements in _generate_arpeggio_track
 ]
 
-[isort]
+[lint.isort]
 known-first-party = ["config", "entities", "game", "sprites", "sounds"]
 
-[mccabe]
+[lint.mccabe]
 max-complexity = 10
 
-[pylint]
+[lint.pylint]
 max-args = 6
 max-branches = 12
 max-returns = 6

@@ -15,6 +15,7 @@ from .entities import (
     Player,
     TripleShotBullet,
 )
+from .hud import HUD, MinimapHUD
 from .performance import OptimizedGroup, bullet_pool, explosion_pool
 from .sounds import sound_manager
 
@@ -67,6 +68,10 @@ class Game:
         # Game entities
         self.player = None
         self.enemy_group = EnemyGroup()
+
+        # HUD systems
+        self.hud = HUD(self.screen)
+        self.minimap = MinimapHUD(self.screen)
 
         # Settings
         self.sound_enabled = SOUND_ENABLED
@@ -268,6 +273,9 @@ class Game:
         self.bonuses.update()
         self.explosions.update()
 
+        # Update HUD
+        self.hud.update(self.player, self.wave, self.enemy_group)
+
         # Enemy shooting
         self.enemy_shoot()
 
@@ -307,6 +315,8 @@ class Game:
                 for enemy in hit_enemies:
                     if self.player:
                         self.player.score += ENEMY_SCORE
+                    # Register kill for combo system
+                    self.hud.register_kill()
                     # Use explosion pool
                     explosion = explosion_pool.get_explosion(
                         Explosion, enemy.rect.centerx, enemy.rect.centery
@@ -391,6 +401,9 @@ class Game:
         self.enemy_group.create_formation(self.wave, self.get_difficulty_modifier())
         self.all_sprites.add(self.enemy_group.enemies)
         self.state = GameState.PLAYING
+
+        # Show wave transition in HUD
+        self.hud.show_wave_transition(self.wave)
 
         # Change music theme based on wave
         theme = self.get_music_theme()
@@ -485,38 +498,6 @@ class Game:
         # Draw all sprites
         self.all_sprites.draw(self.screen)
 
-        # Draw UI
-        if self.player:
-            score_text = self.font.render(
-                f"Score: {self.player.score}", True, NEON_GREEN
-            )
-            self.screen.blit(score_text, (10, 10))
-
-            lives_text = self.font.render(
-                f"Lives: {self.player.lives}", True, NEON_CYAN
-            )
-            self.screen.blit(lives_text, (10, 50))
-
-        wave_text = self.font.render(f"Wave: {self.wave}", True, NEON_YELLOW)
-        self.screen.blit(wave_text, (SCREEN_WIDTH - 150, 10))
-
-        # Draw active bonuses
-        y_offset = 90
-        if self.player:
-            if self.player.shield_active:
-                shield_text = self.font.render("SHIELD ACTIVE", True, NEON_PINK)
-                self.screen.blit(shield_text, (10, y_offset))
-                y_offset += 30
-
-            if self.player.rapid_fire_active:
-                rapid_text = self.font.render("RAPID FIRE", True, NEON_GREEN)
-                self.screen.blit(rapid_text, (10, y_offset))
-                y_offset += 30
-
-        if self.enemy_group.frozen:
-            freeze_text = self.font.render("ENEMIES FROZEN", True, NEON_YELLOW)
-            self.screen.blit(freeze_text, (10, y_offset))
-
         # Draw shield visual effect
         if self.player and self.player.shield_active:
             pygame.draw.circle(
@@ -527,12 +508,22 @@ class Game:
                 3,
             )
 
+        # Draw HUD elements
+        self.hud.render()
+
+        # Draw hearts for lives
+        if self.player:
+            self.hud.render_hearts(self.player.lives)
+
+        # Draw minimap
+        self.minimap.render(self.enemy_group, self.player)
+
         # Draw FPS if enabled
         if self.show_fps:
             fps_text = self.font.render(
                 f"FPS: {int(self.clock.get_fps())}", True, NEON_ORANGE
             )
-            self.screen.blit(fps_text, (SCREEN_WIDTH - 150, 50))
+            self.screen.blit(fps_text, (SCREEN_WIDTH - 150, SCREEN_HEIGHT - 30))
 
     def draw_paused(self):
         """Draw pause screen."""

@@ -119,15 +119,19 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self, x: int, y: int, row: int = 0, is_elite: bool = False):
         super().__init__()
         self.is_elite = is_elite
-        # Elite enemies have a different color/appearance
+
+        # Load appropriate animation frames
         if self.is_elite:
-            self.image = sprite_cache.get("enemy").copy()
-            # Tint elite enemies with red
-            red_surface = pygame.Surface(self.image.get_size())
-            red_surface.fill((255, 100, 100))
-            self.image.blit(red_surface, (0, 0), special_flags=pygame.BLEND_MULT)
+            self.frames = sprite_cache.get("elite_enemy_frames")
         else:
-            self.image = sprite_cache.get("enemy")
+            self.frames = sprite_cache.get("enemy_frames")
+
+        self.current_frame = 0
+        self.animation_speed = 0.1  # Frames per game frame
+        self.animation_counter = 0.0
+
+        # Set initial image
+        self.image = self.frames[0] if self.frames else sprite_cache.get("enemy")
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
@@ -137,7 +141,16 @@ class Enemy(pygame.sprite.Sprite):
         self.last_special_attack = 0  # For elite enemy special attacks
 
     def update(self):
-        """Update enemy position."""
+        """Update enemy position and animation."""
+        # Update animation
+        if self.frames:
+            self.animation_counter += self.animation_speed
+            if self.animation_counter >= 1.0:
+                self.animation_counter = 0.0
+                self.current_frame = (self.current_frame + 1) % len(self.frames)
+                self.image = self.frames[self.current_frame]
+
+        # Update position
         if self.drop_distance > 0:
             self.rect.y += min(self.drop_distance, 2)
             self.drop_distance -= 2
@@ -452,7 +465,7 @@ class EnemyGroup:
                 e for e in self._bottom_enemies_cache if e.alive()
             ]
             if self._bottom_enemies_cache:
-                return self._bottom_enemies_cache
+                return list(self._bottom_enemies_cache)
 
         # Recalculate bottom enemies
         columns: dict[int, list[Enemy]] = {}

@@ -44,6 +44,7 @@ class TestSpriteCache:
                 patch("pygame.draw.polygon"),
                 patch("pygame.draw.circle"),
                 patch("pygame.draw.line"),
+                patch("pygame.draw.lines"),
                 patch("pygame.draw.rect"),
                 patch("pygame.draw.ellipse"),
             ):
@@ -90,6 +91,7 @@ class TestSpriteCache:
                 patch("pygame.draw.polygon") as mock_polygon,
                 patch("pygame.draw.circle") as mock_circle,
                 patch("pygame.draw.line") as mock_line,
+                patch("pygame.draw.lines"),
                 patch("pygame.draw.rect"),
                 patch("pygame.draw.ellipse"),
             ):
@@ -113,6 +115,7 @@ class TestSpriteCache:
                 patch("pygame.draw.rect") as mock_rect,
                 patch("pygame.draw.circle") as mock_circle,
                 patch("pygame.draw.line") as mock_line,
+                patch("pygame.draw.lines"),
                 patch("pygame.draw.polygon"),
                 patch("pygame.draw.ellipse"),
             ):
@@ -137,6 +140,7 @@ class TestSpriteCache:
                 patch("pygame.draw.polygon"),
                 patch("pygame.draw.circle"),
                 patch("pygame.draw.line"),
+                patch("pygame.draw.lines"),
                 patch("pygame.draw.rect"),
             ):
                 sprite_cache = SpriteCache()
@@ -164,6 +168,7 @@ class TestSpriteCache:
                 patch("pygame.draw.polygon"),
                 patch("pygame.draw.circle"),
                 patch("pygame.draw.line"),
+                patch("pygame.draw.lines"),
                 patch("pygame.draw.ellipse"),
             ):
                 sprite_cache = SpriteCache()
@@ -204,6 +209,7 @@ class TestSpriteCache:
                 patch("pygame.draw.polygon"),
                 patch("pygame.draw.rect"),
                 patch("pygame.draw.line"),
+                patch("pygame.draw.lines"),
                 patch("pygame.draw.ellipse"),
             ):
                 sprite_cache = SpriteCache()
@@ -253,8 +259,8 @@ class TestSpriteCache:
         sprite_cache = SpriteCache()
 
         for sprite_name, sprite in sprite_cache._cache.items():
-            if sprite_name == "explosion":
-                # Explosion is a list of frames
+            if sprite_name in ["explosion", "enemy_frames", "elite_enemy_frames"]:
+                # These are lists of animation frames
                 assert isinstance(sprite, list)
                 for frame in sprite:
                     assert isinstance(frame, pygame.Surface)
