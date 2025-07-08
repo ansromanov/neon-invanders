@@ -1,6 +1,17 @@
 # Neon Invaders
 
+[![Tests](https://github.com/ansromanov/neon-invanders/actions/workflows/test.yml/badge.svg)](https://github.com/ansromanov/neon-invanders/actions/workflows/test.yml)
+[![Build](https://github.com/ansromanov/neon-invanders/actions/workflows/build.yml/badge.svg)](https://github.com/ansromanov/neon-invanders/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/ansromanov/neon-invanders/branch/main/graph/badge.svg)](https://codecov.io/gh/ansromanov/neon-invanders)
+
 A modern, neon-themed implementation of the classic Space Invaders game with improved mechanics, Tetris-inspired power-ups, and enhanced ship graphics.
+
+## Project Status
+
+- **Tests**: 170 tests passing ✅
+- **Code Coverage**: See [Codecov](https://codecov.io/gh/ansromanov/neon-invanders) for detailed reports
+- **Code Quality**: Enforced via pre-commit hooks (ruff, mypy, black)
+- **CI/CD**: GitHub Actions for automated testing and multi-platform builds
 
 ## Features
 
