@@ -351,34 +351,43 @@ class TestSettingsMenuDrawing:
         # Test drawing doesn't raise errors
         self.settings_menu.draw()
 
-    def test_draw_with_clipping(self):
+    @patch("pygame.draw.rect")
+    @patch("pygame.draw.circle")
+    @patch("pygame.draw.line")
+    @patch("src.neon_effects.NeonText.draw_glowing_text")
+    def test_draw_with_clipping(
+        self, mock_draw_glowing_text, mock_draw_line, mock_draw_circle, mock_draw_rect
+    ):
         """Test that clipping is properly set and removed."""
-        # Create a mock screen with set_clip method
-        mock_screen = MagicMock()
-        mock_screen.get_width.return_value = 800
-        mock_screen.get_height.return_value = 600
+        # Create a mock surface with tracking for set_clip calls
+        mock_surface = MagicMock(spec=pygame.Surface)
+        mock_surface.get_width.return_value = 800
+        mock_surface.get_height.return_value = 600
 
-        # Create settings menu with mock screen
-        settings_menu = SettingsMenu(mock_screen, self.game)
+        # Track clip calls
+        clip_calls = []
+
+        def track_set_clip(rect):
+            clip_calls.append(rect)
+
+        mock_surface.set_clip.side_effect = track_set_clip
+
+        # Create settings menu with mock surface
+        settings_menu = SettingsMenu(mock_surface, self.game)
 
         # Draw the menu
         settings_menu.draw()
 
         # Should have called set_clip twice (once to set, once to remove with None)
-        assert mock_screen.set_clip.call_count == 2
-
-        # Get the arguments from the calls
-        calls = mock_screen.set_clip.call_args_list
+        assert mock_surface.set_clip.call_count == 2
+        assert len(clip_calls) == 2
 
         # First call should set a clip rect
-        first_call = calls[0]
-        # Check that a pygame.Rect was passed (not None)
-        assert first_call[0][0] is not None
-        assert hasattr(first_call[0][0], "x")  # It should be a Rect-like object
+        assert clip_calls[0] is not None
+        assert isinstance(clip_calls[0], pygame.Rect)
 
         # Second call should remove clipping by passing None
-        second_call = calls[1]
-        assert second_call[0][0] is None
+        assert clip_calls[1] is None
 
 
 class TestSettingsMenuIntegration:

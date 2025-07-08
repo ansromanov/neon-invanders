@@ -1,6 +1,7 @@
 """Performance optimizations for the game."""
 
 import random
+from typing import TypedDict
 
 import pygame
 
@@ -8,7 +9,7 @@ import pygame
 class RenderCache:
     """Cache for pre-rendered surfaces to avoid repeated rendering."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cache: dict[str, pygame.Surface] = {}
         self.glow_cache: dict[tuple[tuple[int, int, int], int], pygame.Surface] = {}
 
@@ -33,7 +34,7 @@ class RenderCache:
 
         return self.glow_cache[key]
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all caches."""
         self.cache.clear()
         self.glow_cache.clear()
@@ -68,7 +69,7 @@ class OptimizedStarField:
                 }
             )
 
-    def update(self):
+    def update(self) -> None:
         """Update star positions."""
         for star in self.stars:
             star["y"] += star["speed"]
@@ -76,12 +77,12 @@ class OptimizedStarField:
                 star["y"] = 0
                 star["x"] = random.randint(0, 800)
 
-    def draw(self, surface: pygame.Surface):
+    def draw(self, surface: pygame.Surface) -> None:
         """Draw stars efficiently."""
         self.star_surface.fill((0, 0, 0, 0))
 
         for star in self.stars:
-            sprite = self.star_sprites[star["sprite_idx"]]
+            sprite = self.star_sprites[int(star["sprite_idx"])]
             # Apply brightness without creating new surface
             pos = (
                 int(star["x"]) - sprite.get_width() // 2,
@@ -92,31 +93,43 @@ class OptimizedStarField:
         surface.blit(self.star_surface, (0, 0))
 
 
+class Particle(TypedDict):
+    active: bool
+    x: float
+    y: float
+    vx: float
+    vy: float
+    life: int
+    max_life: int
+    color: tuple[int, int, int]
+    size: int
+
+
 class ParticlePool:
     """Efficient particle system with object pooling."""
 
     def __init__(self, max_particles: int = 200):
-        self.particles = []
+        self.particles: list[Particle] = []
         self.active_count = 0
         self.max_particles = max_particles
 
         # Pre-allocate particles
         for _ in range(max_particles):
             self.particles.append(
-                {
-                    "active": False,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "vx": 0.0,
-                    "vy": 0.0,
-                    "life": 0,
-                    "max_life": 30,
-                    "color": (255, 255, 255),
-                    "size": 2,
-                }
+                Particle(
+                    active=False,
+                    x=0.0,
+                    y=0.0,
+                    vx=0.0,
+                    vy=0.0,
+                    life=0,
+                    max_life=30,
+                    color=(255, 255, 255),
+                    size=2,
+                )
             )
 
-    def emit(self, x: float, y: float, count: int, color: tuple[int, int, int]):
+    def emit(self, x: float, y: float, count: int, color: tuple[int, int, int]) -> None:
         """Emit particles from pool."""
         import math
         import random
@@ -142,7 +155,7 @@ class ParticlePool:
                 if emitted >= count:
                     break
 
-    def update(self):
+    def update(self) -> None:
         """Update active particles."""
         for particle in self.particles:
             if particle["active"]:
@@ -155,13 +168,18 @@ class ParticlePool:
                     particle["active"] = False
                     self.active_count -= 1
 
-    def draw(self, surface: pygame.Surface):
+    def draw(self, surface: pygame.Surface) -> None:
         """Draw particles efficiently."""
         for particle in self.particles:
             if particle["active"]:
-                alpha = particle["life"] / particle["max_life"]
+                alpha = float(particle["life"]) / float(particle["max_life"])
                 # Draw simple circles without glow
-                color = (*particle["color"], int(alpha * 150))
+                color = (
+                    particle["color"][0],
+                    particle["color"][1],
+                    particle["color"][2],
+                    int(alpha * 150),
+                )
                 pos = (int(particle["x"]), int(particle["y"]))
 
                 # Use pygame.gfxdraw for antialiased circles (faster)
@@ -169,10 +187,10 @@ class ParticlePool:
                     import pygame.gfxdraw
 
                     pygame.gfxdraw.filled_circle(
-                        surface, pos[0], pos[1], particle["size"], color
+                        surface, pos[0], pos[1], int(particle["size"]), color
                     )
                 except:
-                    pygame.draw.circle(surface, color[:3], pos, particle["size"])
+                    pygame.draw.circle(surface, color[:3], pos, int(particle["size"]))
 
 
 class FastNeonEffect:
