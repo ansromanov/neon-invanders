@@ -1,6 +1,7 @@
 """Game entities: Player, Enemy, Bullet, and Bonus classes."""
 
 import random
+from typing import Union
 
 import pygame
 
@@ -115,15 +116,25 @@ class Player(pygame.sprite.Sprite):
 class Enemy(pygame.sprite.Sprite):
     """Enemy invader entity."""
 
-    def __init__(self, x: int, y: int, row: int = 0):
+    def __init__(self, x: int, y: int, row: int = 0, is_elite: bool = False):
         super().__init__()
-        self.image = sprite_cache.get("enemy")
+        self.is_elite = is_elite
+        # Elite enemies have a different color/appearance
+        if self.is_elite:
+            self.image = sprite_cache.get("enemy").copy()
+            # Tint elite enemies with red
+            red_surface = pygame.Surface(self.image.get_size())
+            red_surface.fill((255, 100, 100))
+            self.image.blit(red_surface, (0, 0), special_flags=pygame.BLEND_MULT)
+        else:
+            self.image = sprite_cache.get("enemy")
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
         self.row = row
         self.direction = 1  # 1 for right, -1 for left
         self.drop_distance = 0
+        self.last_special_attack = 0  # For elite enemy special attacks
 
     def update(self):
         """Update enemy position."""
@@ -131,7 +142,9 @@ class Enemy(pygame.sprite.Sprite):
             self.rect.y += min(self.drop_distance, 2)
             self.drop_distance -= 2
         else:
-            self.rect.x += ENEMY_SPEED_X * self.direction
+            # Elite enemies move faster
+            speed_multiplier = 1.5 if self.is_elite else 1.0
+            self.rect.x += int(ENEMY_SPEED_X * self.direction * speed_multiplier)
 
     def reverse_direction(self):
         """Reverse horizontal movement direction and drop down."""
@@ -147,12 +160,65 @@ class Enemy(pygame.sprite.Sprite):
 
             if hasattr(Game, "_instance") and Game._instance:
                 difficulty = Game._instance.get_difficulty_modifier()
-        except:
+        except Exception:
             pass
-        return random.random() < ENEMY_SHOOT_CHANCE * difficulty
 
-    def shoot(self) -> "Bullet":
-        """Create a bullet at enemy position."""
+        # Elite enemies shoot more frequently
+        shoot_chance = ENEMY_SHOOT_CHANCE * difficulty
+        if self.is_elite:
+            shoot_chance *= 3  # 3x more likely to shoot
+
+        return random.random() < shoot_chance
+
+    def shoot(
+        self,
+    ) -> Union["Bullet", "EliteBullet", list["Bullet"], list["EliteBullet"]]:
+        """Create a bullet at enemy position. Elite enemies can shoot multiple bullets."""
+        if self.is_elite:
+            current_time = pygame.time.get_ticks()
+            # Elite enemies have special attack patterns
+            if (
+                current_time - self.last_special_attack > 5000
+            ):  # Special attack every 5 seconds
+                self.last_special_attack = current_time
+                # Triple shot spread pattern
+                bullets = []
+                bullets.append(
+                    EliteBullet(
+                        self.rect.centerx - 10,
+                        self.rect.bottom,
+                        ENEMY_BULLET_SPEED,
+                        "enemy",
+                        -1,
+                    )
+                )
+                bullets.append(
+                    EliteBullet(
+                        self.rect.centerx,
+                        self.rect.bottom,
+                        ENEMY_BULLET_SPEED,
+                        "enemy",
+                        0,
+                    )
+                )
+                bullets.append(
+                    EliteBullet(
+                        self.rect.centerx + 10,
+                        self.rect.bottom,
+                        ENEMY_BULLET_SPEED,
+                        "enemy",
+                        1,
+                    )
+                )
+                return bullets
+            # Regular shot but faster
+            return EliteBullet(
+                self.rect.centerx,
+                self.rect.bottom,
+                int(ENEMY_BULLET_SPEED * 1.5),
+                "enemy",
+                0,
+            )
         return Bullet(self.rect.centerx, self.rect.bottom, ENEMY_BULLET_SPEED, "enemy")
 
 
@@ -175,6 +241,32 @@ class Bullet(pygame.sprite.Sprite):
 
         # Remove bullet if it goes off screen
         if self.rect.bottom < 0 or self.rect.top > SCREEN_HEIGHT:
+            self.kill()
+
+
+class EliteBullet(Bullet):
+    """Special bullet for elite enemies with angled movement."""
+
+    def __init__(self, x: int, y: int, speed: int, owner: str, x_direction: int):
+        super().__init__(x, y, speed, owner)
+        self.x_direction = x_direction  # -1 for left, 0 for straight, 1 for right
+        # Make elite bullets visually distinct (purple tint)
+        purple_surface = pygame.Surface(self.image.get_size())
+        purple_surface.fill((255, 100, 255))
+        self.image.blit(purple_surface, (0, 0), special_flags=pygame.BLEND_MULT)
+
+    def update(self):
+        """Update bullet position with angled movement."""
+        self.rect.y += self.speed
+        self.rect.x += self.x_direction * 2  # Horizontal movement
+
+        # Remove bullet if it goes off screen
+        if (
+            self.rect.bottom < 0
+            or self.rect.top > SCREEN_HEIGHT
+            or self.rect.left > SCREEN_WIDTH
+            or self.rect.right < 0
+        ):
             self.kill()
 
 
@@ -269,12 +361,33 @@ class EnemyGroup:
         #     1 + (wave - 1) * 0.2
         # ) * difficulty_modifier
 
+        # Calculate number of elite enemies for waves 2+
+        total_enemies = ENEMY_ROWS * ENEMY_COLS
+        elite_count = 0
+        if wave >= 2:
+            # 10% elite enemies, increasing slightly with wave
+            elite_percentage = 0.1 + (wave - 2) * 0.02  # +2% per wave after wave 2
+            elite_count = int(total_enemies * min(elite_percentage, 0.3))  # Cap at 30%
+
+        # Create list of positions and randomly assign elites
+        positions = []
         for row in range(ENEMY_ROWS):
             for col in range(ENEMY_COLS):
                 x = col * ENEMY_SPACING_X + 50
                 y = row * ENEMY_SPACING_Y + ENEMY_START_Y
-                enemy = Enemy(x, y, row)
-                self.enemies.add(enemy)
+                positions.append((x, y, row))
+
+        # Randomly select positions for elite enemies
+        if elite_count > 0:
+            elite_positions = random.sample(positions, elite_count)
+        else:
+            elite_positions = []
+
+        # Create enemies
+        for x, y, row in positions:
+            is_elite = (x, y, row) in elite_positions
+            enemy = Enemy(x, y, row, is_elite)
+            self.enemies.add(enemy)
 
     def update(self):
         """Update all enemies with formation movement."""

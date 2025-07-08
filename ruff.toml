@@ -67,6 +67,9 @@ exclude = [".git", ".venv", "__pycache__", "build", "dist"]
     "F405", # undefined names from star imports
     "F403", # star imports
 ]
+"src/sounds.py" = [
+    "PLR0915", # too many statements in _generate_arpeggio_track
+]
 
 [isort]
 known-first-party = ["config", "entities", "game", "sprites", "sounds"]

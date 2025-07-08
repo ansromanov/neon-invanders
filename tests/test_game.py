@@ -92,7 +92,8 @@ class TestGame:
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
         pygame.event.post(event)
 
-        self.game.handle_events()
+        with patch("src.sounds.sound_manager.play_music"):
+            self.game.handle_events()
         assert self.game.state == GameState.PLAYING
         assert self.game.player is not None
 
@@ -267,7 +268,8 @@ class TestGame:
         self.game.reset_game()
         self.game.wave = 1
 
-        self.game.next_wave()
+        with patch("src.sounds.sound_manager.play_music"):
+            self.game.next_wave()
 
         assert self.game.wave == 2
         assert len(self.game.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
@@ -283,6 +285,26 @@ class TestGame:
 
         self.game.difficulty = "Hard"
         assert self.game.get_difficulty_modifier() == 1.5
+
+    def test_get_music_theme(self):
+        """Test music theme selection based on wave."""
+        self.game.wave = 1
+        assert self.game.get_music_theme() == 0  # Theme 1
+
+        self.game.wave = 3
+        assert self.game.get_music_theme() == 0  # Theme 1
+
+        self.game.wave = 4
+        assert self.game.get_music_theme() == 1  # Theme 2
+
+        self.game.wave = 6
+        assert self.game.get_music_theme() == 1  # Theme 2
+
+        self.game.wave = 7
+        assert self.game.get_music_theme() == 2  # Theme 3
+
+        self.game.wave = 10
+        assert self.game.get_music_theme() == 2  # Theme 3
 
     @patch("random.random")
     def test_bonus_spawn_on_enemy_kill(self, mock_random):
@@ -416,7 +438,8 @@ class TestSettingsMenu:
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_LEFT})
         pygame.event.post(event)
 
-        self.game.handle_events()
+        with patch("src.sounds.sound_manager.stop_music"):
+            self.game.handle_events()
         assert self.game.sound_enabled != initial_sound
 
     def test_settings_volume_adjustment(self):
@@ -492,7 +515,9 @@ class TestGameIntegration:
         # Start game
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
         pygame.event.post(event)
-        self.game.handle_events()
+
+        with patch("src.sounds.sound_manager.play_music"):
+            self.game.handle_events()
 
         assert self.game.state == GameState.PLAYING
         assert self.game.player is not None
@@ -529,7 +554,9 @@ class TestGameIntegration:
         # Continue to wave 2
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
         pygame.event.post(event)
-        self.game.handle_events()
+
+        with patch("src.sounds.sound_manager.play_music"):
+            self.game.handle_events()
 
         assert self.game.wave == 2
         assert self.game.state == GameState.PLAYING

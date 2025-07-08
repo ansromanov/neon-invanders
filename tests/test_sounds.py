@@ -45,6 +45,7 @@ class TestSoundManager:
             patch.object(SoundManager, "_generate_game_over_sound") as mock_game_over,
             patch.object(SoundManager, "_generate_power_up_sound") as mock_power_up,
             patch.object(SoundManager, "_generate_shield_hit_sound") as mock_shield_hit,
+            patch.object(SoundManager, "_generate_all_music_themes"),
         ):
             # Create mock sounds
             mock_sounds = {
@@ -76,7 +77,7 @@ class TestSoundManager:
             mock_mixer_init.assert_called_once_with(
                 frequency=22050, size=-16, channels=2, buffer=512
             )
-            mock_set_channels.assert_called_once_with(8)
+            mock_set_channels.assert_called_once_with(12)
 
             # Check sounds dictionary
             assert hasattr(sound_manager, "sounds")

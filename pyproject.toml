@@ -88,6 +88,10 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 
+[[tool.mypy.overrides]]
+module = "src.entities"
+warn_unreachable = false
+
 [tool.bandit]
 targets = ["."]
 exclude_dirs = ["tests", ".venv", "__pycache__"]

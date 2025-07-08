@@ -31,6 +31,7 @@ from src.config import (
 from src.entities import (
     Bonus,
     Bullet,
+    EliteBullet,
     Enemy,
     EnemyGroup,
     Explosion,
@@ -241,6 +242,75 @@ class TestEnemy:
         assert bullet.speed == ENEMY_BULLET_SPEED
         assert bullet.owner == "enemy"
 
+    def test_elite_enemy_initialization(self):
+        """Test elite enemy is initialized correctly."""
+        elite_enemy = Enemy(100, 100, 0, is_elite=True)
+        assert elite_enemy.is_elite is True
+        assert elite_enemy.rect.x == 100
+        assert elite_enemy.rect.y == 100
+        assert elite_enemy.last_special_attack == 0
+
+    def test_elite_enemy_moves_faster(self):
+        """Test elite enemy moves faster than regular enemy."""
+        elite_enemy = Enemy(100, 100, 0, is_elite=True)
+        regular_enemy = Enemy(100, 200, 0, is_elite=False)
+
+        initial_elite_x = elite_enemy.rect.x
+        initial_regular_x = regular_enemy.rect.x
+
+        elite_enemy.update()
+        regular_enemy.update()
+
+        elite_movement = elite_enemy.rect.x - initial_elite_x
+        regular_movement = regular_enemy.rect.x - initial_regular_x
+
+        # Elite enemies move 1.5x faster, but we need to account for integer conversion
+        expected_elite_movement = int(ENEMY_SPEED_X * 1.5)
+        expected_regular_movement = ENEMY_SPEED_X
+
+        assert elite_movement == expected_elite_movement
+        assert regular_movement == expected_regular_movement
+
+    @patch("random.random")
+    def test_elite_enemy_shoots_more_frequently(self, mock_random):
+        """Test elite enemy shoots 3x more frequently."""
+        elite_enemy = Enemy(100, 100, 0, is_elite=True)
+        regular_enemy = Enemy(100, 200, 0, is_elite=False)
+
+        # Test at same random value
+        mock_random.return_value = 0.0025  # Between regular and elite threshold
+
+        # Regular enemy shouldn't shoot at this probability
+        assert regular_enemy.can_shoot() is False
+        # Elite enemy should shoot (3x more likely)
+        assert elite_enemy.can_shoot() is True
+
+    @patch("pygame.time.get_ticks")
+    def test_elite_enemy_special_attack(self, mock_time):
+        """Test elite enemy special triple shot attack."""
+        elite_enemy = Enemy(100, 100, 0, is_elite=True)
+
+        # First shot with time=0 should trigger special attack (since last_special_attack=0)
+        mock_time.return_value = 5001  # More than 5 seconds from initialization
+        bullets = elite_enemy.shoot()
+        assert isinstance(bullets, list)
+        assert len(bullets) == 3
+        assert all(isinstance(b, EliteBullet) for b in bullets)
+        assert elite_enemy.last_special_attack == 5001
+
+        # Next shot within 5 seconds should be regular
+        mock_time.return_value = 8000  # Less than 5 seconds from last special
+        bullet = elite_enemy.shoot()
+        assert isinstance(bullet, EliteBullet)
+        assert not isinstance(bullet, list)
+        assert bullet.speed == int(ENEMY_BULLET_SPEED * 1.5)
+
+        # After 5 seconds, should be special attack again
+        mock_time.return_value = 10002  # More than 5 seconds from last special
+        bullets = elite_enemy.shoot()
+        assert isinstance(bullets, list)
+        assert len(bullets) == 3
+
 
 class TestBullet:
     """Test cases for Bullet entity."""
@@ -379,6 +449,53 @@ class TestBonus:
         assert len(group) == 0  # Bonus should be removed
 
 
+class TestEliteBullet:
+    """Test cases for EliteBullet entity."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Set up test fixtures."""
+        pygame.init()
+        yield
+        pygame.quit()
+
+    def test_elite_bullet_initialization(self):
+        """Test elite bullet is initialized correctly."""
+        bullet = EliteBullet(100, 200, ENEMY_BULLET_SPEED, "enemy", 1)
+        assert bullet.rect.centerx == 100
+        assert bullet.rect.centery == 200
+        assert bullet.speed == ENEMY_BULLET_SPEED
+        assert bullet.owner == "enemy"
+        assert bullet.x_direction == 1
+
+    def test_elite_bullet_angled_movement(self):
+        """Test elite bullet moves at an angle."""
+        bullet = EliteBullet(100, 200, 5, "enemy", 1)
+        initial_x = bullet.rect.x
+        initial_y = bullet.rect.y
+        bullet.update()
+        assert bullet.rect.y == initial_y + 5
+        assert bullet.rect.x == initial_x + 2  # x_direction * 2
+
+    def test_elite_bullet_removal_sides(self):
+        """Test elite bullet is removed when going off sides."""
+        # Test left side - bullet needs to be at edge and move off
+        bullet = EliteBullet(1, 200, 5, "enemy", -3)
+        group = pygame.sprite.Group(bullet)
+        # Move bullet off screen
+        bullet.rect.right = 0  # Force it off the left edge
+        bullet.update()
+        assert len(group) == 0  # Should be removed
+
+        # Test right side
+        bullet = EliteBullet(SCREEN_WIDTH - 1, 200, 5, "enemy", 3)
+        group = pygame.sprite.Group(bullet)
+        # Move bullet off screen
+        bullet.rect.left = SCREEN_WIDTH + 1  # Force it off the right edge
+        bullet.update()
+        assert len(group) == 0  # Should be removed
+
+
 class TestExplosion:
     """Test cases for Explosion entity."""
 
@@ -439,9 +556,38 @@ class TestEnemyGroup:
         assert len(self.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
 
     def test_create_formation_wave_2(self):
-        """Test enemy formation for wave 2."""
+        """Test enemy formation for wave 2 includes elite enemies."""
+        # Create formation for wave 2
         self.enemy_group.create_formation(2)
         assert len(self.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
+
+        # Count elite enemies - should be ~10% of total
+        elite_enemies = [e for e in self.enemy_group.enemies if e.is_elite]
+        total_enemies = ENEMY_ROWS * ENEMY_COLS
+        expected_elite_count = int(total_enemies * 0.1)  # 10% elite enemies
+
+        # Allow for some variation due to randomness
+        assert len(elite_enemies) >= expected_elite_count - 1
+        assert len(elite_enemies) <= expected_elite_count + 2
+
+    def test_create_formation_increasing_elites(self):
+        """Test elite enemy percentage increases with waves."""
+        # Wave 2: 10%
+        self.enemy_group.create_formation(2)
+        wave2_elites = sum(1 for e in self.enemy_group.enemies if e.is_elite)
+
+        # Wave 3: 12%
+        self.enemy_group.create_formation(3)
+        wave3_elites = sum(1 for e in self.enemy_group.enemies if e.is_elite)
+
+        # Wave 3 should have more elite enemies (allowing for randomness)
+        total_enemies = ENEMY_ROWS * ENEMY_COLS
+        expected_wave2 = int(total_enemies * 0.1)
+        expected_wave3 = int(total_enemies * 0.12)
+
+        # Check ranges due to randomness
+        assert wave2_elites >= expected_wave2 - 1
+        assert wave3_elites >= expected_wave3 - 1
 
     def test_create_formation_with_difficulty(self):
         """Test enemy formation with difficulty modifier."""

@@ -14,7 +14,10 @@ from .sounds import sound_manager
 class Game:
     """Main game class managing states and game logic."""
 
+    _instance = None
+
     def __init__(self):
+        Game._instance = self
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Neon Invaders")
@@ -114,6 +117,9 @@ class Game:
                     if event.key == pygame.K_SPACE:
                         self.state = GameState.PLAYING
                         self.reset_game()
+                        # Start background music with appropriate theme
+                        theme = self.get_music_theme()
+                        sound_manager.play_music(theme)
                     elif event.key == pygame.K_s:
                         self.state = GameState.SETTINGS
                         self.selected_setting = 0
@@ -131,10 +137,12 @@ class Game:
                         self.state = GameState.PLAYING
                     elif event.key == pygame.K_q:
                         self.state = GameState.MENU
+                        sound_manager.stop_music()  # Stop music when quitting to menu
 
                 elif self.state == GameState.GAME_OVER:
                     if event.key == pygame.K_SPACE:
                         self.state = GameState.MENU
+                        sound_manager.stop_music()  # Stop music when returning to menu
 
                 elif self.state == GameState.WAVE_CLEAR:
                     if event.key == pygame.K_SPACE:
@@ -169,9 +177,15 @@ class Game:
         bottom_enemies = self.enemy_group.get_bottom_enemies()
         for enemy in bottom_enemies:
             if enemy.can_shoot():
-                bullet = enemy.shoot()
-                self.enemy_bullets.add(bullet)
-                self.all_sprites.add(bullet)
+                result = enemy.shoot()
+                # Elite enemies can return a list of bullets
+                if isinstance(result, list):
+                    for bullet in result:
+                        self.enemy_bullets.add(bullet)
+                        self.all_sprites.add(bullet)
+                else:
+                    self.enemy_bullets.add(result)
+                    self.all_sprites.add(result)
                 # Play enemy shooting sound
                 sound_manager.play("enemy_shoot")
 
@@ -205,12 +219,14 @@ class Game:
                 self.save_high_score()
                 # Play game over sound
                 sound_manager.play("game_over")
+                sound_manager.stop_music()  # Stop music on game over
             elif self.enemy_group.check_player_collision(self.player.rect):
                 self.player.lives = 0
                 self.state = GameState.GAME_OVER
                 self.save_high_score()
                 # Play game over sound
                 sound_manager.play("game_over")
+                sound_manager.stop_music()  # Stop music on game over
             elif self.enemy_group.is_empty():
                 self.state = GameState.WAVE_CLEAR
                 self.player.score += WAVE_CLEAR_BONUS
@@ -310,6 +326,10 @@ class Game:
         self.all_sprites.add(self.enemy_group.enemies)
         self.state = GameState.PLAYING
 
+        # Change music theme based on wave
+        theme = self.get_music_theme()
+        sound_manager.play_music(theme)
+
     def get_difficulty_modifier(self):
         """Get difficulty modifier for enemy behavior."""
         if self.difficulty == "Easy":
@@ -317,6 +337,14 @@ class Game:
         if self.difficulty == "Hard":
             return 1.5  # 50% faster/more aggressive
         return 1.0  # Normal
+
+    def get_music_theme(self) -> int:
+        """Get music theme index based on current wave."""
+        if self.wave <= 3:
+            return 0  # Theme 1: Original Synthwave
+        if self.wave <= 6:
+            return 1  # Theme 2: Dark Techno
+        return 2  # Theme 3: Epic Boss Battle
 
     def handle_setting_change(self, key):
         """Handle changing settings values."""
@@ -326,6 +354,11 @@ class Game:
                 # Update global sound state
                 global SOUND_ENABLED
                 SOUND_ENABLED = self.sound_enabled
+                # Update sound manager
+                sound_manager.sound_enabled = self.sound_enabled
+                # Stop music if sound is disabled
+                if not self.sound_enabled:
+                    sound_manager.stop_music()
         elif self.selected_setting == 1:  # Volume
             if key == pygame.K_LEFT and self.sound_volume > 0:
                 self.sound_volume = max(0, self.sound_volume - 0.1)
@@ -334,6 +367,8 @@ class Game:
             # Update all sound volumes
             for sound in sound_manager.sounds.values():
                 sound.set_volume(self.sound_volume)
+            # Also update music volume
+            sound_manager.set_music_volume(self.sound_volume)
         elif self.selected_setting == 2:  # FPS Display
             if key == pygame.K_LEFT or key == pygame.K_RIGHT:
                 self.show_fps = not self.show_fps
