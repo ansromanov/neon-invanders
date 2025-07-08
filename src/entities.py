@@ -234,6 +234,9 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.centery = y
         self.speed = speed
         self.owner = owner
+        # Initialize optional attributes for pooling compatibility
+        self.x_velocity: float = 0.0
+        self.x_direction = 0
 
     def update(self):
         """Update bullet position."""
@@ -242,6 +245,13 @@ class Bullet(pygame.sprite.Sprite):
         # Remove bullet if it goes off screen
         if self.rect.bottom < 0 or self.rect.top > SCREEN_HEIGHT:
             self.kill()
+            # Return bullet to pool when killed
+            try:
+                from .performance import bullet_pool
+
+                bullet_pool.release_bullet(self)
+            except ImportError:
+                pass
 
 
 class EliteBullet(Bullet):
@@ -275,7 +285,7 @@ class TripleShotBullet(Bullet):
 
     def __init__(self, x: int, y: int, speed: int, owner: str, x_velocity: float):
         super().__init__(x, y, speed, owner)
-        self.x_velocity = x_velocity
+        self.x_velocity: float = x_velocity
 
     def update(self):
         """Update bullet position with angled movement."""
@@ -337,6 +347,13 @@ class Explosion(pygame.sprite.Sprite):
 
             if self.current_frame >= len(self.frames):
                 self.kill()
+                # Return explosion to pool when animation completes
+                try:
+                    from .performance import explosion_pool
+
+                    explosion_pool.release_explosion(self)
+                except ImportError:
+                    pass
             else:
                 self.image = self.frames[self.current_frame]
                 self.rect = self.image.get_rect(center=self.rect.center)
@@ -351,6 +368,9 @@ class EnemyGroup:
         self.drop_timer = 0
         self.frozen = False
         self.freeze_end_time = 0
+        # Cache for bottom enemies to reduce recalculation
+        self._bottom_enemies_cache = []
+        self._cache_dirty = True
 
     def create_formation(self, wave: int = 1, difficulty_modifier: float = 1.0):  # noqa: ARG002
         """Create the initial enemy formation."""
@@ -389,6 +409,9 @@ class EnemyGroup:
             enemy = Enemy(x, y, row, is_elite)
             self.enemies.add(enemy)
 
+        # Mark cache as dirty when formation changes
+        self._cache_dirty = True
+
     def update(self):
         """Update all enemies with formation movement."""
         # Check if freeze expired
@@ -416,9 +439,22 @@ class EnemyGroup:
         # Update all enemies
         self.enemies.update()
 
+        # Mark cache as dirty if any enemies were removed
+        if len(self.enemies) != len(self._bottom_enemies_cache):
+            self._cache_dirty = True
+
     def get_bottom_enemies(self) -> list[Enemy]:
         """Get enemies that can shoot (bottom row of each column)."""
-        # Group enemies by column
+        # Use cached result if available
+        if not self._cache_dirty and self._bottom_enemies_cache:
+            # Validate cache - remove any dead enemies
+            self._bottom_enemies_cache = [
+                e for e in self._bottom_enemies_cache if e.alive()
+            ]
+            if self._bottom_enemies_cache:
+                return self._bottom_enemies_cache
+
+        # Recalculate bottom enemies
         columns: dict[int, list[Enemy]] = {}
         for enemy in self.enemies:
             col = enemy.rect.centerx // ENEMY_SPACING_X
@@ -432,6 +468,10 @@ class EnemyGroup:
             if enemies:
                 bottom_enemy = max(enemies, key=lambda e: e.rect.bottom)
                 bottom_enemies.append(bottom_enemy)
+
+        # Cache the result
+        self._bottom_enemies_cache = bottom_enemies
+        self._cache_dirty = False
 
         return bottom_enemies
 

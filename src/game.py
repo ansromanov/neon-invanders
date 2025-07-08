@@ -7,7 +7,15 @@ import random
 import pygame
 
 from .config import *
-from .entities import Bonus, EnemyGroup, Explosion, Player
+from .entities import (
+    Bonus,
+    EliteBullet,
+    EnemyGroup,
+    Explosion,
+    Player,
+    TripleShotBullet,
+)
+from .performance import OptimizedGroup, bullet_pool, explosion_pool
 from .sounds import sound_manager
 
 
@@ -49,10 +57,10 @@ class Game:
         self.wave = 1
         self.high_score = self.load_high_score()
 
-        # Sprite groups
+        # Sprite groups - use optimized groups for better collision detection
         self.all_sprites = pygame.sprite.Group()
-        self.player_bullets = pygame.sprite.Group()
-        self.enemy_bullets = pygame.sprite.Group()
+        self.player_bullets = OptimizedGroup()
+        self.enemy_bullets = OptimizedGroup()
         self.bonuses = pygame.sprite.Group()
         self.explosions = pygame.sprite.Group()
 
@@ -163,8 +171,26 @@ class Game:
         if self.player and self.player.can_shoot(pygame.time.get_ticks()):
             bullets = self.player.shoot(pygame.time.get_ticks())
             for bullet in bullets:
-                self.player_bullets.add(bullet)
-                self.all_sprites.add(bullet)
+                # Use bullet pool - handle special bullet types
+                if isinstance(bullet, TripleShotBullet):
+                    pooled_bullet = bullet_pool.get_bullet(
+                        TripleShotBullet,
+                        bullet.rect.centerx,
+                        bullet.rect.centery,
+                        bullet.speed,
+                        bullet.owner,
+                        bullet.x_velocity,
+                    )
+                else:
+                    pooled_bullet = bullet_pool.get_bullet(
+                        type(bullet),
+                        bullet.rect.centerx,
+                        bullet.rect.centery,
+                        bullet.speed,
+                        bullet.owner,
+                    )
+                self.player_bullets.add(pooled_bullet)
+                self.all_sprites.add(pooled_bullet)
             # Play shooting sound
             sound_manager.play("player_shoot")
 
@@ -181,11 +207,47 @@ class Game:
                 # Elite enemies can return a list of bullets
                 if isinstance(result, list):
                     for bullet in result:
-                        self.enemy_bullets.add(bullet)
-                        self.all_sprites.add(bullet)
+                        # Handle EliteBullet with x_direction parameter
+                        if hasattr(bullet, "x_direction"):
+                            pooled_bullet = bullet_pool.get_bullet(
+                                EliteBullet,
+                                bullet.rect.centerx,
+                                bullet.rect.centery,
+                                bullet.speed,
+                                bullet.owner,
+                                bullet.x_direction,
+                            )
+                        else:
+                            pooled_bullet = bullet_pool.get_bullet(
+                                type(bullet),
+                                bullet.rect.centerx,
+                                bullet.rect.centery,
+                                bullet.speed,
+                                bullet.owner,
+                            )
+                        self.enemy_bullets.add(pooled_bullet)
+                        self.all_sprites.add(pooled_bullet)
                 else:
-                    self.enemy_bullets.add(result)
-                    self.all_sprites.add(result)
+                    # Handle single bullet
+                    if hasattr(result, "x_direction"):
+                        pooled_bullet = bullet_pool.get_bullet(
+                            EliteBullet,
+                            result.rect.centerx,
+                            result.rect.centery,
+                            result.speed,
+                            result.owner,
+                            result.x_direction,
+                        )
+                    else:
+                        pooled_bullet = bullet_pool.get_bullet(
+                            type(result),
+                            result.rect.centerx,
+                            result.rect.centery,
+                            result.speed,
+                            result.owner,
+                        )
+                    self.enemy_bullets.add(pooled_bullet)
+                    self.all_sprites.add(pooled_bullet)
                 # Play enemy shooting sound
                 sound_manager.play("enemy_shoot")
 
@@ -245,7 +307,10 @@ class Game:
                 for enemy in hit_enemies:
                     if self.player:
                         self.player.score += ENEMY_SCORE
-                    explosion = Explosion(enemy.rect.centerx, enemy.rect.centery)
+                    # Use explosion pool
+                    explosion = explosion_pool.get_explosion(
+                        Explosion, enemy.rect.centerx, enemy.rect.centery
+                    )
                     self.explosions.add(explosion)
                     self.all_sprites.add(explosion)
                     # Play explosion sound
@@ -270,8 +335,9 @@ class Game:
                     # Play explosion sound
                     sound_manager.play("explosion")
                 self.player.hit()
-                explosion = Explosion(
-                    self.player.rect.centerx, self.player.rect.centery
+                # Use explosion pool
+                explosion = explosion_pool.get_explosion(
+                    Explosion, self.player.rect.centerx, self.player.rect.centery
                 )
                 self.explosions.add(explosion)
                 self.all_sprites.add(explosion)
