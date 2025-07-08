@@ -16,7 +16,7 @@ Runs on every push and pull request to `main` and `develop` branches.
   3. Install dependencies
   4. Run linting checks (`make lint`)
   5. Run type checking (`make type-check`)
-  6. Run tests with coverage reporting
+  6. Run tests with coverage reporting (with `SDL_AUDIODRIVER=dummy` to avoid ALSA errors)
   7. Upload coverage reports to Codecov
 
 ### Build and Test (`build.yml`)
@@ -29,8 +29,8 @@ Runs on every push and pull request to `main` and `develop` branches, plus manua
   1. Install uv package manager
   2. Set up Python environment
   3. Install dependencies
-  4. Run tests
-  5. Verify the game can start
+  4. Run tests (with `SDL_AUDIODRIVER=dummy` to avoid ALSA errors)
+  5. Verify the game can start (with dummy SDL drivers for headless environment)
 
 ## Codecov Integration
 
@@ -60,6 +60,13 @@ act -W .github/workflows/test.yml
 # Run the build workflow
 act -W .github/workflows/build.yml
 ```
+
+## Environment Variables
+
+The workflows set the following environment variables to handle headless CI environments:
+
+- `SDL_AUDIODRIVER=dummy` - Prevents ALSA audio errors in GitHub Actions
+- `SDL_VIDEODRIVER=dummy` - Prevents video driver errors when testing game startup
 
 ## Workflow Status Badges
 

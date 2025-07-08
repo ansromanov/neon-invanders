@@ -36,7 +36,12 @@ jobs:
     - name: Run tests
       run: |
         uv run pytest -v
+      env:
+        SDL_AUDIODRIVER: dummy
 
     - name: Build the game
       run: |
         uv run python src/main.py --test-mode || echo "Game started successfully"
+      env:
+        SDL_AUDIODRIVER: dummy
+        SDL_VIDEODRIVER: dummy
