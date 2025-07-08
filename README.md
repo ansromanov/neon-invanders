@@ -6,6 +6,8 @@
 
 A modern, neon-themed Space Invaders game built for the **AWS Build Classic Games with Amazon Q Developer CLI** challenge.
 
+![Neon Invaders Gameplay](assets/game.png)
+
 ## Features
 
 - Classic Space Invaders mechanics with modern twists
