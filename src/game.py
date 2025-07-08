@@ -16,6 +16,16 @@ from .entities import (
     TripleShotBullet,
 )
 from .hud import HUD, MinimapHUD
+from .neon_effects import (
+    HeartBeat,
+    NeonEffect,
+    NeonGrid,
+    NeonText,
+    NeonTrail,
+    RainbowPulse,
+    SparkleEffect,
+    StarField,
+)
 from .performance import OptimizedGroup, bullet_pool, explosion_pool
 from .sounds import sound_manager
 
@@ -76,8 +86,21 @@ class Game:
         # Settings
         self.sound_enabled = SOUND_ENABLED
         self.sound_volume = SOUND_VOLUME
+        self.music_enabled = MUSIC_ENABLED
         self.show_fps = False
         self.difficulty = "Normal"  # Easy, Normal, Hard
+        self.particles_enabled = True  # Enable/disable particle effects
+
+        # Visual effects
+        self.starfield = StarField(STAR_COUNT) if STARS_ENABLED else None
+        self.neon_grid = NeonGrid(60, NEON_PURPLE, 20) if NEON_GRID_ENABLED else None
+        self.rainbow_pulses = []  # For bonus collection effects
+        self.sparkle_effects = []  # For various sparkle animations
+        self.player_trail = (
+            NeonTrail(NEON_GREEN, PLAYER_TRAIL_LENGTH) if PLAYER_TRAIL_ENABLED else None
+        )
+        self.menu_heartbeat = HeartBeat((SCREEN_WIDTH - 50, 50), NEON_RED)
+        self.neon_effect = NeonEffect(NEON_CYAN)
 
     def load_high_score(self) -> int:
         """Load high score from file."""
@@ -130,9 +153,10 @@ class Game:
                     if event.key == pygame.K_SPACE:
                         self.state = GameState.PLAYING
                         self.reset_game()
-                        # Start background music with appropriate theme
-                        theme = self.get_music_theme()
-                        sound_manager.play_music(theme)
+                        # Start background music with appropriate theme if enabled
+                        if self.music_enabled:
+                            theme = self.get_music_theme()
+                            sound_manager.play_music(theme)
                     elif event.key == pygame.K_s:
                         self.state = GameState.SETTINGS
                         self.selected_setting = 0
@@ -167,7 +191,7 @@ class Game:
                     elif event.key == pygame.K_UP:
                         self.selected_setting = max(0, self.selected_setting - 1)
                     elif event.key == pygame.K_DOWN:
-                        self.selected_setting = min(3, self.selected_setting + 1)
+                        self.selected_setting = min(5, self.selected_setting + 1)
                     elif event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
                         self.handle_setting_change(event.key)
 
@@ -258,6 +282,25 @@ class Game:
 
     def update(self):
         """Update game state."""
+        # Always update visual effects
+        if self.starfield:
+            self.starfield.update()
+        if self.neon_grid:
+            self.neon_grid.update()
+        self.menu_heartbeat.update()
+
+        # Update rainbow pulses
+        for pulse in self.rainbow_pulses[:]:
+            pulse.update()
+            if not pulse.active:
+                self.rainbow_pulses.remove(pulse)
+
+        # Update sparkle effects
+        for sparkle in self.sparkle_effects[:]:
+            sparkle.update()
+            if not sparkle.active:
+                self.sparkle_effects.remove(sparkle)
+
         if self.state != GameState.PLAYING:
             return
 
@@ -265,6 +308,11 @@ class Game:
         keys = pygame.key.get_pressed()
         if self.player:
             self.player.update(keys)
+            # Add trail effect for player movement if enabled
+            if self.player_trail:
+                self.player_trail.add_point(
+                    (self.player.rect.centerx, self.player.rect.centery)
+                )
 
         # Update all other sprites
         self.enemy_group.update()
@@ -290,6 +338,9 @@ class Game:
                 # Play game over sound
                 sound_manager.play("game_over")
                 sound_manager.stop_music()  # Stop music on game over
+                # Clear player trail if enabled
+                if self.player_trail:
+                    self.player_trail.clear()
             elif self.enemy_group.check_player_collision(self.player.rect):
                 self.player.lives = 0
                 self.state = GameState.GAME_OVER
@@ -297,11 +348,20 @@ class Game:
                 # Play game over sound
                 sound_manager.play("game_over")
                 sound_manager.stop_music()  # Stop music on game over
+                # Clear player trail if enabled
+                if self.player_trail:
+                    self.player_trail.clear()
             elif self.enemy_group.is_empty():
                 self.state = GameState.WAVE_CLEAR
                 self.player.score += WAVE_CLEAR_BONUS
                 # Play wave clear sound
                 sound_manager.play("wave_clear")
+                # Add celebration sparkles only if particles enabled
+                if self.particles_enabled:
+                    for _ in range(5):
+                        x = random.randint(100, SCREEN_WIDTH - 100)
+                        y = random.randint(100, SCREEN_HEIGHT - 100)
+                        self.sparkle_effects.append(SparkleEffect((x, y)))
 
     def check_collisions(self):
         """Check all game collisions."""
@@ -317,12 +377,13 @@ class Game:
                         self.player.score += ENEMY_SCORE
                     # Register kill for combo system
                     self.hud.register_kill()
-                    # Use explosion pool
-                    explosion = explosion_pool.get_explosion(
-                        Explosion, enemy.rect.centerx, enemy.rect.centery
-                    )
-                    self.explosions.add(explosion)
-                    self.all_sprites.add(explosion)
+                    # Use explosion pool only if particles are enabled
+                    if self.particles_enabled:
+                        explosion = explosion_pool.get_explosion(
+                            Explosion, enemy.rect.centerx, enemy.rect.centery
+                        )
+                        self.explosions.add(explosion)
+                        self.all_sprites.add(explosion)
                     # Play explosion sound
                     sound_manager.play("explosion")
 
@@ -331,6 +392,11 @@ class Game:
                         bonus = Bonus(enemy.rect.centerx, enemy.rect.centery)
                         self.bonuses.add(bonus)
                         self.all_sprites.add(bonus)
+                        # Add sparkle effect for bonus spawn only if particles enabled
+                        if self.particles_enabled:
+                            self.sparkle_effects.append(
+                                SparkleEffect((bonus.rect.centerx, bonus.rect.centery))
+                            )
 
         # Enemy bullets hitting player
         if self.player:
@@ -345,12 +411,13 @@ class Game:
                     # Play explosion sound
                     sound_manager.play("explosion")
                 self.player.hit()
-                # Use explosion pool
-                explosion = explosion_pool.get_explosion(
-                    Explosion, self.player.rect.centerx, self.player.rect.centery
-                )
-                self.explosions.add(explosion)
-                self.all_sprites.add(explosion)
+                # Use explosion pool only if particles are enabled
+                if self.particles_enabled:
+                    explosion = explosion_pool.get_explosion(
+                        Explosion, self.player.rect.centerx, self.player.rect.centery
+                    )
+                    self.explosions.add(explosion)
+                    self.all_sprites.add(explosion)
 
         # Player collecting bonuses
         if self.player:
@@ -361,6 +428,11 @@ class Game:
                 self.apply_bonus_effect(bonus.shape_type)
                 # Play bonus collection sound
                 sound_manager.play("bonus_collect")
+                # Add rainbow pulse effect at collection point only if particles enabled
+                if self.particles_enabled:
+                    self.rainbow_pulses.append(
+                        RainbowPulse((bonus.rect.centerx, bonus.rect.centery))
+                    )
 
     def apply_bonus_effect(self, bonus_type: int):
         """Apply bonus effect based on Tetris block type."""
@@ -405,9 +477,10 @@ class Game:
         # Show wave transition in HUD
         self.hud.show_wave_transition(self.wave)
 
-        # Change music theme based on wave
-        theme = self.get_music_theme()
-        sound_manager.play_music(theme)
+        # Change music theme based on wave if music is enabled
+        if self.music_enabled:
+            theme = self.get_music_theme()
+            sound_manager.play_music(theme)
 
     def get_difficulty_modifier(self):
         """Get difficulty modifier for enemy behavior."""
@@ -438,7 +511,21 @@ class Game:
                 # Stop music if sound is disabled
                 if not self.sound_enabled:
                     sound_manager.stop_music()
-        elif self.selected_setting == 1:  # Volume
+                    self.music_enabled = False  # Also disable music when sound is off
+        elif self.selected_setting == 1:  # Music
+            if key == pygame.K_LEFT or key == pygame.K_RIGHT:
+                self.music_enabled = not self.music_enabled
+                # Update global music state
+                global MUSIC_ENABLED
+                MUSIC_ENABLED = self.music_enabled
+                # Stop or start music based on setting
+                if not self.music_enabled:
+                    sound_manager.stop_music()
+                elif self.state == GameState.PLAYING and self.sound_enabled:
+                    # Restart music if in game and sound is enabled
+                    theme = self.get_music_theme()
+                    sound_manager.play_music(theme)
+        elif self.selected_setting == 2:  # Volume
             if key == pygame.K_LEFT and self.sound_volume > 0:
                 self.sound_volume = max(0, self.sound_volume - 0.1)
             elif key == pygame.K_RIGHT and self.sound_volume < 1:
@@ -448,10 +535,13 @@ class Game:
                 sound.set_volume(self.sound_volume)
             # Also update music volume
             sound_manager.set_music_volume(self.sound_volume)
-        elif self.selected_setting == 2:  # FPS Display
+        elif self.selected_setting == 3:  # FPS Display
             if key == pygame.K_LEFT or key == pygame.K_RIGHT:
                 self.show_fps = not self.show_fps
-        elif self.selected_setting == 3:  # Difficulty
+        elif self.selected_setting == 4:  # Particles
+            if key == pygame.K_LEFT or key == pygame.K_RIGHT:
+                self.particles_enabled = not self.particles_enabled
+        elif self.selected_setting == 5:  # Difficulty
             difficulties = ["Easy", "Normal", "Hard"]
             current_idx = difficulties.index(self.difficulty)
             if key == pygame.K_LEFT:
@@ -465,48 +555,102 @@ class Game:
         # Draw background
         self.screen.blit(self.background, (0, 0))
 
-        # Title
-        title_text = self.big_font.render("NEON INVADERS", True, NEON_GREEN)
-        title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
-        self.screen.blit(title_text, title_rect)
+        # Draw starfield if enabled
+        if self.starfield:
+            self.starfield.draw(self.screen)
+
+        # Draw neon grid with perspective if enabled
+        if self.neon_grid:
+            self.neon_grid.draw(self.screen)
+
+        # Title with neon glow effect
+        NeonText.draw_glowing_text(
+            self.screen,
+            "NEON INVADERS",
+            self.big_font,
+            (SCREEN_WIDTH // 2, 150),
+            NEON_GREEN,
+            glow_intensity=4,
+        )
 
         # High score
-        high_score_text = self.font.render(
-            f"High Score: {self.high_score}", True, NEON_YELLOW
+        NeonText.draw_glowing_text(
+            self.screen,
+            f"High Score: {self.high_score}",
+            self.font,
+            (SCREEN_WIDTH // 2, 250),
+            NEON_YELLOW,
         )
-        high_score_rect = high_score_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
-        self.screen.blit(high_score_text, high_score_rect)
 
-        # Instructions
-        start_text = self.font.render("Press SPACE to Start", True, NEON_CYAN)
-        start_rect = start_text.get_rect(center=(SCREEN_WIDTH // 2, 350))
-        self.screen.blit(start_text, start_rect)
+        # Instructions with pulsing effect
+        pulse_offset = abs(pygame.time.get_ticks() % 2000 - 1000) / 1000.0
+        start_color = (
+            int(NEON_CYAN[0] * (0.7 + 0.3 * pulse_offset)),
+            int(NEON_CYAN[1] * (0.7 + 0.3 * pulse_offset)),
+            int(NEON_CYAN[2] * (0.7 + 0.3 * pulse_offset)),
+        )
 
-        settings_text = self.font.render("Press S for Settings", True, NEON_PURPLE)
-        settings_rect = settings_text.get_rect(center=(SCREEN_WIDTH // 2, 400))
-        self.screen.blit(settings_text, settings_rect)
+        NeonText.draw_glowing_text(
+            self.screen,
+            "Press SPACE to Start",
+            self.font,
+            (SCREEN_WIDTH // 2, 350),
+            start_color,
+        )
 
-        quit_text = self.font.render("Press ESC to Quit", True, NEON_PINK)
-        quit_rect = quit_text.get_rect(center=(SCREEN_WIDTH // 2, 450))
-        self.screen.blit(quit_text, quit_rect)
+        NeonText.draw_glowing_text(
+            self.screen,
+            "Press S for Settings",
+            self.font,
+            (SCREEN_WIDTH // 2, 400),
+            NEON_PURPLE,
+        )
+
+        NeonText.draw_glowing_text(
+            self.screen,
+            "Press ESC to Quit",
+            self.font,
+            (SCREEN_WIDTH // 2, 450),
+            NEON_PINK,
+        )
+
+        # Draw heartbeat animation in corner
+        self.menu_heartbeat.draw(self.screen)
+
+        # Draw rainbow pulses
+        for pulse in self.rainbow_pulses:
+            pulse.draw(self.screen)
 
     def draw_game(self):
         """Draw game play screen."""
         # Draw background
         self.screen.blit(self.background, (0, 0))
 
+        # Draw starfield if enabled
+        if self.starfield:
+            self.starfield.draw(self.screen)
+
+        # Draw player trail if enabled
+        if self.player_trail:
+            self.player_trail.draw(self.screen)
+
         # Draw all sprites
         self.all_sprites.draw(self.screen)
 
-        # Draw shield visual effect
+        # Draw shield visual effect with enhanced glow
         if self.player and self.player.shield_active:
-            pygame.draw.circle(
-                self.screen,
-                (*NEON_CYAN, 100),
-                (self.player.rect.centerx, self.player.rect.centery),
-                35,
-                3,
+            self.neon_effect.draw_glowing_circle(
+                self.screen, (self.player.rect.centerx, self.player.rect.centery), 35, 3
             )
+
+        # Draw rainbow pulses only if particles enabled
+        if self.particles_enabled:
+            for pulse in self.rainbow_pulses:
+                pulse.draw(self.screen)
+
+            # Draw sparkle effects
+            for sparkle in self.sparkle_effects:
+                sparkle.draw(self.screen)
 
         # Draw HUD elements
         self.hud.render()
@@ -535,23 +679,32 @@ class Game:
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
 
-        # Pause text
-        pause_text = self.big_font.render("PAUSED", True, NEON_YELLOW)
-        pause_rect = pause_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-        self.screen.blit(pause_text, pause_rect)
+        # Pause text with glow
+        NeonText.draw_glowing_text(
+            self.screen,
+            "PAUSED",
+            self.big_font,
+            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2),
+            NEON_YELLOW,
+            glow_intensity=4,
+        )
 
-        resume_text = self.font.render(
-            "Press ESC to Resume | Q to Quit", True, NEON_CYAN
+        NeonText.draw_glowing_text(
+            self.screen,
+            "Press ESC to Resume | Q to Quit",
+            self.font,
+            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80),
+            NEON_CYAN,
         )
-        resume_rect = resume_text.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 80)
-        )
-        self.screen.blit(resume_text, resume_rect)
 
     def draw_game_over(self):
         """Draw game over screen."""
         # Draw background
         self.screen.blit(self.background, (0, 0))
+
+        # Draw starfield if enabled
+        if self.starfield:
+            self.starfield.draw(self.screen)
 
         # Darken background for game over
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -559,80 +712,136 @@ class Game:
         overlay.fill(BLACK)
         self.screen.blit(overlay, (0, 0))
 
-        # Game over text
-        game_over_text = self.big_font.render("GAME OVER", True, NEON_RED)
-        game_over_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, 150))
-        self.screen.blit(game_over_text, game_over_rect)
+        # Game over text with dramatic glow
+        NeonText.draw_glowing_text(
+            self.screen,
+            "GAME OVER",
+            self.big_font,
+            (SCREEN_WIDTH // 2, 150),
+            NEON_RED,
+            glow_intensity=5,
+        )
 
         # Final score
         if self.player:
-            score_text = self.font.render(
-                f"Final Score: {self.player.score}", True, NEON_YELLOW
+            NeonText.draw_glowing_text(
+                self.screen,
+                f"Final Score: {self.player.score}",
+                self.font,
+                (SCREEN_WIDTH // 2, 250),
+                NEON_YELLOW,
             )
-            score_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, 250))
-            self.screen.blit(score_text, score_rect)
 
             # High score
             if self.player.score > self.high_score:
-                new_high_text = self.font.render("NEW HIGH SCORE!", True, NEON_GREEN)
-                new_high_rect = new_high_text.get_rect(center=(SCREEN_WIDTH // 2, 300))
-                self.screen.blit(new_high_text, new_high_rect)
+                # Animate new high score with rainbow effect
+                time_offset = pygame.time.get_ticks() / 100
+                hue = int(time_offset * 10) % 360
+                color = pygame.Color(0)
+                color.hsva = (hue, 100, 100, 100)
+
+                NeonText.draw_glowing_text(
+                    self.screen,
+                    "NEW HIGH SCORE!",
+                    self.font,
+                    (SCREEN_WIDTH // 2, 300),
+                    (color.r, color.g, color.b),
+                    glow_intensity=3,
+                )
+
+                # Add sparkles around new high score only if particles enabled
+                if self.particles_enabled and random.random() < 0.3:
+                    x = SCREEN_WIDTH // 2 + random.randint(-150, 150)
+                    y = 300 + random.randint(-20, 20)
+                    self.sparkle_effects.append(SparkleEffect((x, y)))
             else:
-                high_score_text = self.font.render(
-                    f"High Score: {self.high_score}", True, NEON_CYAN
+                NeonText.draw_glowing_text(
+                    self.screen,
+                    f"High Score: {self.high_score}",
+                    self.font,
+                    (SCREEN_WIDTH // 2, 300),
+                    NEON_CYAN,
                 )
-                high_score_rect = high_score_text.get_rect(
-                    center=(SCREEN_WIDTH // 2, 300)
-                )
-                self.screen.blit(high_score_text, high_score_rect)
 
         # Continue text
-        continue_text = self.font.render("Press SPACE to Continue", True, NEON_PURPLE)
-        continue_rect = continue_text.get_rect(center=(SCREEN_WIDTH // 2, 400))
-        self.screen.blit(continue_text, continue_rect)
+        NeonText.draw_glowing_text(
+            self.screen,
+            "Press SPACE to Continue",
+            self.font,
+            (SCREEN_WIDTH // 2, 400),
+            NEON_PURPLE,
+        )
+
+        # Draw sparkle effects only if particles enabled
+        if self.particles_enabled:
+            for sparkle in self.sparkle_effects:
+                sparkle.draw(self.screen)
 
     def draw_wave_clear(self):
         """Draw wave clear screen."""
         self.draw_game()  # Draw game in background
 
-        # Wave clear text
-        wave_clear_text = self.big_font.render(
-            f"WAVE {self.wave} CLEAR!", True, NEON_GREEN
+        # Wave clear text with celebration effect
+        NeonText.draw_glowing_text(
+            self.screen,
+            f"WAVE {self.wave} CLEAR!",
+            self.big_font,
+            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2),
+            NEON_GREEN,
+            glow_intensity=4,
         )
-        wave_clear_rect = wave_clear_text.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        )
-        self.screen.blit(wave_clear_text, wave_clear_rect)
 
-        bonus_text = self.font.render(
-            f"Wave Bonus: {WAVE_CLEAR_BONUS}", True, NEON_YELLOW
+        NeonText.draw_glowing_text(
+            self.screen,
+            f"Wave Bonus: {WAVE_CLEAR_BONUS}",
+            self.font,
+            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 60),
+            NEON_YELLOW,
         )
-        bonus_rect = bonus_text.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 60)
-        )
-        self.screen.blit(bonus_text, bonus_rect)
 
-        continue_text = self.font.render("Press SPACE to Continue", True, NEON_CYAN)
-        continue_rect = continue_text.get_rect(
-            center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100)
+        NeonText.draw_glowing_text(
+            self.screen,
+            "Press SPACE to Continue",
+            self.font,
+            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100),
+            NEON_CYAN,
         )
-        self.screen.blit(continue_text, continue_rect)
+
+        # Draw celebration sparkles only if particles enabled
+        if self.particles_enabled:
+            for sparkle in self.sparkle_effects:
+                sparkle.draw(self.screen)
 
     def draw_settings(self):
         """Draw settings menu."""
         # Draw background
         self.screen.blit(self.background, (0, 0))
 
-        # Title
-        title_text = self.big_font.render("SETTINGS", True, NEON_GREEN)
-        title_rect = title_text.get_rect(center=(SCREEN_WIDTH // 2, 100))
-        self.screen.blit(title_text, title_rect)
+        # Draw starfield if enabled
+        if self.starfield:
+            self.starfield.draw(self.screen)
+
+        # Draw grid if enabled
+        if self.neon_grid:
+            self.neon_grid.draw(self.screen)
+
+        # Title with glow
+        NeonText.draw_glowing_text(
+            self.screen,
+            "SETTINGS",
+            self.big_font,
+            (SCREEN_WIDTH // 2, 100),
+            NEON_GREEN,
+            glow_intensity=3,
+        )
 
         # Settings options
         settings = [
             ("Sound", "ON" if self.sound_enabled else "OFF"),
+            ("Music", "ON" if self.music_enabled else "OFF"),
             ("Volume", f"{int(self.sound_volume * 100)}%"),
             ("Show FPS", "ON" if self.show_fps else "OFF"),
+            ("Particles", "ON" if self.particles_enabled else "OFF"),
             ("Difficulty", self.difficulty),
         ]
 

@@ -15,6 +15,7 @@ from src.config import (
     ENEMY_COLS,
     ENEMY_ROWS,
     ENEMY_SCORE,
+    MUSIC_ENABLED,
     SOUND_ENABLED,
     SOUND_VOLUME,
     WAVE_CLEAR_BONUS,
@@ -46,8 +47,10 @@ class TestGame:
         assert self.game.player is None
         assert self.game.sound_enabled == SOUND_ENABLED
         assert self.game.sound_volume == SOUND_VOLUME
+        assert self.game.music_enabled == MUSIC_ENABLED
         assert self.game.show_fps is False
         assert self.game.difficulty == "Normal"
+        assert self.game.particles_enabled is True
 
     def test_load_high_score_no_file(self):
         """Test loading high score when no file exists."""
@@ -430,6 +433,22 @@ class TestSettingsMenu:
         self.game.handle_events()
         assert self.game.selected_setting == 2
 
+    def test_settings_navigation_boundaries(self):
+        """Test navigation boundaries in settings menu."""
+        # Test upper boundary
+        self.game.selected_setting = 0
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_UP})
+        pygame.event.post(event)
+        self.game.handle_events()
+        assert self.game.selected_setting == 0
+
+        # Test lower boundary - we now have 6 settings (0-5)
+        self.game.selected_setting = 5
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_DOWN})
+        pygame.event.post(event)
+        self.game.handle_events()
+        assert self.game.selected_setting == 5
+
     def test_settings_sound_toggle(self):
         """Test toggling sound on/off."""
         initial_sound = self.game.sound_enabled
@@ -442,9 +461,21 @@ class TestSettingsMenu:
             self.game.handle_events()
         assert self.game.sound_enabled != initial_sound
 
+    def test_settings_music_toggle(self):
+        """Test toggling music on/off."""
+        initial_music = self.game.music_enabled
+        self.game.selected_setting = 1
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_LEFT})
+        pygame.event.post(event)
+
+        with patch("src.sounds.sound_manager.stop_music"):
+            self.game.handle_events()
+        assert self.game.music_enabled != initial_music
+
     def test_settings_volume_adjustment(self):
         """Test adjusting volume."""
-        self.game.selected_setting = 1
+        self.game.selected_setting = 2
         self.game.sound_volume = 0.5
 
         # Test volume increase
@@ -462,7 +493,7 @@ class TestSettingsMenu:
     def test_settings_fps_toggle(self):
         """Test toggling FPS display."""
         initial_fps = self.game.show_fps
-        self.game.selected_setting = 2
+        self.game.selected_setting = 3
 
         event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RIGHT})
         pygame.event.post(event)
@@ -470,9 +501,20 @@ class TestSettingsMenu:
         self.game.handle_events()
         assert self.game.show_fps != initial_fps
 
+    def test_settings_particles_toggle(self):
+        """Test toggling particles on/off."""
+        initial_particles = self.game.particles_enabled
+        self.game.selected_setting = 4
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_RIGHT})
+        pygame.event.post(event)
+
+        self.game.handle_events()
+        assert self.game.particles_enabled != initial_particles
+
     def test_settings_difficulty_change(self):
         """Test changing difficulty."""
-        self.game.selected_setting = 3
+        self.game.selected_setting = 5
         self.game.difficulty = "Normal"
 
         # Test changing to Hard
@@ -561,3 +603,241 @@ class TestGameIntegration:
         assert self.game.wave == 2
         assert self.game.state == GameState.PLAYING
         assert len(self.game.enemy_group.enemies) == ENEMY_ROWS * ENEMY_COLS
+
+
+class TestParticleEffects:
+    """Test cases for particle effects functionality."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Set up test fixtures."""
+        pygame.init()
+        self.game = Game()
+        self.game.reset_game()
+        yield
+        pygame.quit()
+
+    def test_particles_enabled_explosion_on_enemy_kill(self):
+        """Test that explosions are created when particles are enabled."""
+        self.game.particles_enabled = True
+
+        # Get an enemy position
+        enemy = next(iter(self.game.enemy_group.enemies))
+        enemy_pos = (enemy.rect.centerx, enemy.rect.centery)
+
+        # Create a bullet at enemy position
+        bullet = Bullet(enemy_pos[0], enemy_pos[1], 0, "player")
+        self.game.player_bullets.add(bullet)
+
+        initial_explosions = len(self.game.explosions)
+
+        # Check collisions with mocked sound
+        with patch("src.sounds.sound_manager.play"):
+            self.game.check_collisions()
+
+        # Explosion should be created
+        assert len(self.game.explosions) == initial_explosions + 1
+
+    def test_particles_disabled_no_explosion_on_enemy_kill(self):
+        """Test that no explosions are created when particles are disabled."""
+        self.game.particles_enabled = False
+
+        # Get an enemy position
+        enemy = next(iter(self.game.enemy_group.enemies))
+        enemy_pos = (enemy.rect.centerx, enemy.rect.centery)
+
+        # Create a bullet at enemy position
+        bullet = Bullet(enemy_pos[0], enemy_pos[1], 0, "player")
+        self.game.player_bullets.add(bullet)
+
+        initial_explosions = len(self.game.explosions)
+
+        # Check collisions with mocked sound
+        with patch("src.sounds.sound_manager.play"):
+            self.game.check_collisions()
+
+        # No explosion should be created
+        assert len(self.game.explosions) == initial_explosions
+
+    def test_particles_enabled_sparkle_on_bonus_spawn(self):
+        """Test that sparkle effects are created when particles are enabled."""
+        self.game.particles_enabled = True
+
+        # Get an enemy position
+        enemy = next(iter(self.game.enemy_group.enemies))
+        enemy_pos = (enemy.rect.centerx, enemy.rect.centery)
+
+        # Create a bullet at enemy position
+        bullet = Bullet(enemy_pos[0], enemy_pos[1], 0, "player")
+        self.game.player_bullets.add(bullet)
+
+        initial_sparkles = len(self.game.sparkle_effects)
+
+        # Mock random to ensure bonus spawns
+        with (
+            patch("random.random", return_value=0.1),
+            patch("src.sounds.sound_manager.play"),
+        ):
+            self.game.check_collisions()
+
+        # Sparkle effect should be created for bonus spawn
+        assert len(self.game.sparkle_effects) > initial_sparkles
+
+    def test_particles_disabled_no_sparkle_on_bonus_spawn(self):
+        """Test that no sparkle effects are created when particles are disabled."""
+        self.game.particles_enabled = False
+
+        # Get an enemy position
+        enemy = next(iter(self.game.enemy_group.enemies))
+        enemy_pos = (enemy.rect.centerx, enemy.rect.centery)
+
+        # Create a bullet at enemy position
+        bullet = Bullet(enemy_pos[0], enemy_pos[1], 0, "player")
+        self.game.player_bullets.add(bullet)
+
+        initial_sparkles = len(self.game.sparkle_effects)
+
+        # Mock random to ensure bonus spawns
+        with (
+            patch("random.random", return_value=0.1),
+            patch("src.sounds.sound_manager.play"),
+        ):
+            self.game.check_collisions()
+
+        # No sparkle effect should be created
+        assert len(self.game.sparkle_effects) == initial_sparkles
+
+    def test_particles_enabled_rainbow_pulse_on_bonus_collect(self):
+        """Test that rainbow pulse is created when particles are enabled."""
+        self.game.particles_enabled = True
+
+        # Create bonus at player position
+        assert self.game.player is not None
+        bonus = Bonus(self.game.player.rect.centerx, self.game.player.rect.centery)
+        self.game.bonuses.add(bonus)
+
+        initial_pulses = len(self.game.rainbow_pulses)
+
+        # Check collisions with mocked sound
+        with patch("src.sounds.sound_manager.play"):
+            self.game.check_collisions()
+
+        # Rainbow pulse should be created
+        assert len(self.game.rainbow_pulses) == initial_pulses + 1
+
+    def test_particles_disabled_no_rainbow_pulse_on_bonus_collect(self):
+        """Test that no rainbow pulse is created when particles are disabled."""
+        self.game.particles_enabled = False
+
+        # Create bonus at player position
+        assert self.game.player is not None
+        bonus = Bonus(self.game.player.rect.centerx, self.game.player.rect.centery)
+        self.game.bonuses.add(bonus)
+
+        initial_pulses = len(self.game.rainbow_pulses)
+
+        # Check collisions with mocked sound
+        with patch("src.sounds.sound_manager.play"):
+            self.game.check_collisions()
+
+        # No rainbow pulse should be created
+        assert len(self.game.rainbow_pulses) == initial_pulses
+
+    def test_particles_enabled_celebration_sparkles_on_wave_clear(self):
+        """Test that celebration sparkles are created when particles are enabled."""
+        self.game.state = GameState.PLAYING
+        self.game.particles_enabled = True
+
+        # Clear all enemies
+        self.game.enemy_group.enemies.empty()
+
+        initial_sparkles = len(self.game.sparkle_effects)
+
+        with patch("src.sounds.sound_manager.play"):
+            self.game.update()
+
+        # Should have created 5 celebration sparkles
+        assert len(self.game.sparkle_effects) == initial_sparkles + 5
+
+    def test_particles_disabled_no_celebration_sparkles_on_wave_clear(self):
+        """Test that no celebration sparkles are created when particles are disabled."""
+        self.game.state = GameState.PLAYING
+        self.game.particles_enabled = False
+
+        # Clear all enemies
+        self.game.enemy_group.enemies.empty()
+
+        initial_sparkles = len(self.game.sparkle_effects)
+
+        with patch("src.sounds.sound_manager.play"):
+            self.game.update()
+
+        # No sparkles should be created
+        assert len(self.game.sparkle_effects) == initial_sparkles
+
+
+class TestMusicSettings:
+    """Test cases for music settings functionality."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Set up test fixtures."""
+        pygame.init()
+        self.game = Game()
+        yield
+        pygame.quit()
+
+    def test_music_plays_when_enabled_on_game_start(self):
+        """Test that music plays when enabled and game starts."""
+        self.game.music_enabled = True
+        self.game.state = GameState.MENU
+
+        # Start game
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
+        pygame.event.post(event)
+
+        with patch("src.sounds.sound_manager.play_music") as mock_play_music:
+            self.game.handle_events()
+            mock_play_music.assert_called_once()
+
+    def test_music_does_not_play_when_disabled_on_game_start(self):
+        """Test that music doesn't play when disabled and game starts."""
+        self.game.music_enabled = False
+        self.game.state = GameState.MENU
+
+        # Start game
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_SPACE})
+        pygame.event.post(event)
+
+        with patch("src.sounds.sound_manager.play_music") as mock_play_music:
+            self.game.handle_events()
+            mock_play_music.assert_not_called()
+
+    def test_music_stops_when_disabled_in_settings(self):
+        """Test that music stops when disabled in settings during gameplay."""
+        self.game.music_enabled = True
+        self.game.state = GameState.SETTINGS
+        self.game.selected_setting = 1  # Music setting
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_LEFT})
+        pygame.event.post(event)
+
+        with patch("src.sounds.sound_manager.stop_music") as mock_stop_music:
+            self.game.handle_events()
+            mock_stop_music.assert_called_once()
+            assert self.game.music_enabled is False
+
+    def test_sound_disable_also_disables_music(self):
+        """Test that disabling sound also disables music."""
+        self.game.sound_enabled = True
+        self.game.music_enabled = True
+        self.game.state = GameState.SETTINGS
+        self.game.selected_setting = 0  # Sound setting
+
+        event = pygame.event.Event(pygame.KEYDOWN, {"key": pygame.K_LEFT})
+        pygame.event.post(event)
+
+        with patch("src.sounds.sound_manager.stop_music"):
+            self.game.handle_events()
+            assert self.game.sound_enabled is False
+            assert self.game.music_enabled is False

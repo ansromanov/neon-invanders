@@ -39,7 +39,7 @@ class SpriteCache:
         return self._cache.get(sprite_name)
 
     def _create_player_sprite(self):
-        """Create the player ship sprite."""
+        """Create the player ship sprite with enhanced details."""
         sprite = pygame.Surface((40, 30), pygame.SRCALPHA)
 
         # Main body - sleek fighter design
@@ -60,7 +60,7 @@ class SpriteCache:
             ],
         )
 
-        # Wing details
+        # Wing details with gradient effect
         pygame.draw.polygon(
             sprite,
             NEON_GREEN,
@@ -73,18 +73,30 @@ class SpriteCache:
             2,
         )
 
-        # Cockpit with glow effect
+        # Cockpit with multi-layer glow effect
+        pygame.draw.circle(sprite, (*NEON_YELLOW, 100), (20, 12), 6)
         pygame.draw.circle(sprite, NEON_YELLOW, (20, 12), 4)
         pygame.draw.circle(sprite, NEON_ORANGE, (20, 12), 2)
+        pygame.draw.circle(sprite, WHITE, (20, 11), 1)  # Highlight
 
-        # Engine glow
+        # Engine glow with pulse effect
+        pygame.draw.circle(sprite, (*NEON_PURPLE, 100), (8, 28), 5)
         pygame.draw.circle(sprite, NEON_PURPLE, (8, 28), 3)
-        pygame.draw.circle(sprite, NEON_PURPLE, (32, 28), 3)
+        pygame.draw.circle(sprite, (*NEON_PINK, 200), (8, 28), 1)
 
-        # Highlight lines
+        pygame.draw.circle(sprite, (*NEON_PURPLE, 100), (32, 28), 5)
+        pygame.draw.circle(sprite, NEON_PURPLE, (32, 28), 3)
+        pygame.draw.circle(sprite, (*NEON_PINK, 200), (32, 28), 1)
+
+        # Highlight lines with glow
+        pygame.draw.line(sprite, (*NEON_GREEN, 150), (20, 0), (20, 10), 3)
         pygame.draw.line(sprite, NEON_GREEN, (20, 0), (20, 8), 2)
         pygame.draw.line(sprite, NEON_CYAN, (5, 25), (12, 20), 1)
         pygame.draw.line(sprite, NEON_CYAN, (35, 25), (28, 20), 1)
+
+        # Add small detail dots
+        pygame.draw.circle(sprite, NEON_YELLOW, (15, 15), 1)
+        pygame.draw.circle(sprite, NEON_YELLOW, (25, 15), 1)
 
         return sprite
 
@@ -254,23 +266,57 @@ class SpriteCache:
         return sprite
 
     def _create_tetris_sprite(self, shape_type):
-        """Create a tetris-themed bonus sprite."""
-        sprite = pygame.Surface((20, 20), pygame.SRCALPHA)
+        """Create a tetris-themed bonus sprite with enhanced visuals."""
+        sprite = pygame.Surface((36, 36), pygame.SRCALPHA)  # Increased from 24x24
         colors = [NEON_CYAN, NEON_YELLOW, NEON_PURPLE, NEON_PINK, NEON_GREEN]
         color = colors[shape_type]
 
         shapes = [
-            [(0, 0), (1, 0), (0, 1), (1, 1)],  # O
-            [(1, 0), (0, 1), (1, 1), (2, 1)],  # T
-            [(0, 0), (1, 0), (2, 0), (3, 0)],  # I
-            [(0, 1), (1, 1), (1, 0), (2, 0)],  # S
-            [(0, 0), (1, 0), (1, 1), (2, 1)],  # Z
+            [(0, 0), (1, 0), (0, 1), (1, 1)],  # O - Extra Life
+            [(1, 0), (0, 1), (1, 1), (2, 1)],  # T - Freeze
+            [(0, 0), (1, 0), (2, 0), (3, 0)],  # I - Triple Shot
+            [(0, 1), (1, 1), (1, 0), (2, 0)],  # S - Shield
+            [(0, 0), (1, 0), (1, 1), (2, 1)],  # Z - Rapid Fire
         ]
 
+        # Draw blocks with 3D effect - larger blocks
+        block_size = 8  # Increased from 5
         for x, y in shapes[shape_type]:
-            pygame.draw.rect(sprite, color, (x * 5, y * 5, 5, 5))
-            # Add glow effect
-            pygame.draw.rect(sprite, color, (x * 5, y * 5, 5, 5), 1)
+            block_x = x * block_size + 2
+            block_y = y * block_size + 2
+
+            # Shadow
+            pygame.draw.rect(
+                sprite,
+                (*BLACK, 100),
+                (block_x + 1, block_y + 1, block_size, block_size),
+            )
+
+            # Main block with gradient
+            pygame.draw.rect(sprite, color, (block_x, block_y, block_size, block_size))
+
+            # Inner highlight
+            pygame.draw.rect(
+                sprite,
+                (*color, 150),
+                (block_x + 1, block_y + 1, block_size - 2, block_size - 2),
+            )
+
+            # Bright spot
+            pygame.draw.rect(sprite, (*WHITE, 100), (block_x + 1, block_y + 1, 2, 2))
+
+            # Glow outline
+            pygame.draw.rect(
+                sprite,
+                (*color, 100),
+                (block_x - 1, block_y - 1, block_size + 2, block_size + 2),
+                1,
+            )
+
+        # Add sparkle effect at center - adjusted for larger size
+        center_x, center_y = 18, 18
+        pygame.draw.circle(sprite, (*WHITE, 150), (center_x, center_y), 3)
+        pygame.draw.circle(sprite, (*color, 200), (center_x, center_y), 4, 1)
 
         return sprite
 
@@ -290,40 +336,66 @@ class SpriteCache:
         return frames
 
     def _create_heart_sprite(self):
-        """Create a heart sprite for lives display."""
-        sprite = pygame.Surface((20, 18), pygame.SRCALPHA)
+        """Create a heart sprite for lives display with enhanced glow."""
+        sprite = pygame.Surface((24, 22), pygame.SRCALPHA)
+
+        # Glow effect
+        pygame.draw.circle(sprite, (*NEON_RED, 50), (12, 10), 10)
 
         # Draw heart shape
         # Top curves
-        pygame.draw.circle(sprite, NEON_RED, (6, 6), 5)
-        pygame.draw.circle(sprite, NEON_RED, (14, 6), 5)
+        pygame.draw.circle(sprite, NEON_RED, (8, 8), 5)
+        pygame.draw.circle(sprite, NEON_RED, (16, 8), 5)
         # Bottom triangle
-        pygame.draw.polygon(sprite, NEON_RED, [(2, 8), (10, 17), (18, 8)])
+        pygame.draw.polygon(sprite, NEON_RED, [(4, 10), (12, 19), (20, 10)])
 
-        # Inner highlight
-        pygame.draw.circle(sprite, (*NEON_PINK, 128), (7, 7), 2)
+        # Inner gradient
+        pygame.draw.circle(sprite, (*NEON_PINK, 180), (8, 8), 3)
+        pygame.draw.circle(sprite, (*NEON_PINK, 180), (16, 8), 3)
+        pygame.draw.polygon(sprite, (*NEON_PINK, 150), [(7, 11), (12, 16), (17, 11)])
+
+        # Highlights
+        pygame.draw.circle(sprite, (*WHITE, 150), (9, 7), 1)
+        pygame.draw.circle(sprite, (*WHITE, 100), (10, 8), 1)
 
         return sprite
 
     def _create_shield_icon_sprite(self):
-        """Create a shield icon for HUD."""
-        sprite = pygame.Surface((20, 22), pygame.SRCALPHA)
+        """Create a shield icon for HUD with enhanced effects."""
+        sprite = pygame.Surface((24, 26), pygame.SRCALPHA)
+
+        # Glow effect
+        glow_points = [
+            (12, 0),  # Top center
+            (22, 4),  # Top right
+            (22, 14),  # Right side
+            (12, 24),  # Bottom point
+            (2, 14),  # Left side
+            (2, 4),  # Top left
+        ]
+        pygame.draw.polygon(sprite, (*NEON_CYAN, 30), glow_points)
 
         # Shield outline
         points = [
-            (10, 2),  # Top center
-            (18, 6),  # Top right
-            (18, 12),  # Right side
-            (10, 20),  # Bottom point
-            (2, 12),  # Left side
-            (2, 6),  # Top left
+            (12, 4),  # Top center
+            (20, 8),  # Top right
+            (20, 14),  # Right side
+            (12, 22),  # Bottom point
+            (4, 14),  # Left side
+            (4, 8),  # Top left
         ]
         pygame.draw.polygon(sprite, NEON_CYAN, points)
-        pygame.draw.polygon(sprite, (*NEON_CYAN, 128), points, 2)
+        pygame.draw.polygon(sprite, (*NEON_CYAN, 200), points, 2)
 
-        # Inner design
-        pygame.draw.line(sprite, NEON_GREEN, (10, 5), (10, 15), 2)
-        pygame.draw.line(sprite, NEON_GREEN, (6, 9), (14, 9), 2)
+        # Inner design - cross pattern
+        pygame.draw.line(sprite, (*NEON_GREEN, 200), (12, 7), (12, 17), 3)
+        pygame.draw.line(sprite, NEON_GREEN, (12, 7), (12, 17), 2)
+        pygame.draw.line(sprite, (*NEON_GREEN, 200), (8, 11), (16, 11), 3)
+        pygame.draw.line(sprite, NEON_GREEN, (8, 11), (16, 11), 2)
+
+        # Center gem
+        pygame.draw.circle(sprite, (*NEON_YELLOW, 150), (12, 11), 2)
+        pygame.draw.circle(sprite, WHITE, (12, 11), 1)
 
         return sprite
 
