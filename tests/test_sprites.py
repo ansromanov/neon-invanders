@@ -10,8 +10,8 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import *
-from sprites import SpriteCache
+from src.config import *
+from src.sprites import SpriteCache
 
 
 class TestSpriteCache:
@@ -251,10 +251,10 @@ class TestSpriteCache:
             ]
             # Note: This assertion might need adjustment based on actual calls
 
-    @patch("sprites.sprite_cache", MagicMock())
+    @patch("src.sprites.sprite_cache", MagicMock())
     def test_module_level_sprite_cache_exists(self):
         """Test that the module-level sprite_cache is available."""
-        import sprites
+        from src import sprites
 
         # The sprite_cache should exist
         assert hasattr(sprites, "sprite_cache")

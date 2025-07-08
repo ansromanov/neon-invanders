@@ -4,8 +4,8 @@ import random
 
 import pygame
 
-from config import *
-from sprites import sprite_cache
+from .config import *
+from .sprites import sprite_cache
 
 
 class Player(pygame.sprite.Sprite):
@@ -143,7 +143,7 @@ class Enemy(pygame.sprite.Sprite):
         # Get difficulty modifier from game
         difficulty = 1.0
         try:
-            from game import Game
+            from .game import Game
 
             if hasattr(Game, "_instance") and Game._instance:
                 difficulty = Game._instance.get_difficulty_modifier()

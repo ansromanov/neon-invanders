@@ -3,7 +3,7 @@
 import numpy as np
 import pygame
 
-from config import SOUND_ENABLED, SOUND_VOLUME
+from .config import SOUND_ENABLED, SOUND_VOLUME
 
 
 class SoundManager:
@@ -35,7 +35,7 @@ class SoundManager:
 
     def play(self, sound_name: str):
         """Play a sound by name."""
-        from config import SOUND_ENABLED
+        from .config import SOUND_ENABLED
 
         if not SOUND_ENABLED:
             return

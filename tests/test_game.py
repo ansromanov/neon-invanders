@@ -10,9 +10,9 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import *
-from entities import Bonus, Bullet, Player
-from game import Game
+from src.config import *
+from src.entities import Bonus, Bullet, Player
+from src.game import Game
 
 
 class TestGame:

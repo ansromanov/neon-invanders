@@ -11,8 +11,8 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import SOUND_VOLUME
-from sounds import SoundManager
+from src.config import SOUND_VOLUME
+from src.sounds import SoundManager
 
 
 class TestSoundManager:
@@ -27,7 +27,7 @@ class TestSoundManager:
         pygame.mixer.quit()
         pygame.quit()
 
-    @patch("sounds.SOUND_ENABLED", True)
+    @patch("src.sounds.SOUND_ENABLED", True)
     @patch("pygame.mixer.init")
     @patch("pygame.mixer.set_num_channels")
     def test_sound_manager_initialization_enabled(
@@ -87,7 +87,7 @@ class TestSoundManager:
             for sound in mock_sounds.values():
                 sound.set_volume.assert_called_once_with(SOUND_VOLUME)
 
-    @patch("sounds.SOUND_ENABLED", False)
+    @patch("src.sounds.SOUND_ENABLED", False)
     def test_sound_manager_initialization_disabled(self):
         """Test sound manager initialization when sound is disabled."""
         sound_manager = SoundManager()
@@ -95,7 +95,7 @@ class TestSoundManager:
         # When sound is disabled, nothing should be initialized
         assert not hasattr(sound_manager, "sounds") or sound_manager.sounds == {}
 
-    @patch("sounds.SOUND_ENABLED", True)
+    @patch("src.sounds.SOUND_ENABLED", True)
     @patch("pygame.mixer.init")
     @patch("pygame.mixer.set_num_channels")
     @patch("pygame.sndarray.make_sound")
@@ -116,7 +116,10 @@ class TestSoundManager:
     def test_play_sound_disabled(self):
         """Test playing sound when sound is disabled."""
         # Test with patching at the module level since play() imports SOUND_ENABLED
-        with patch("sounds.SOUND_ENABLED", False), patch("config.SOUND_ENABLED", False):
+        with (
+            patch("src.sounds.SOUND_ENABLED", False),
+            patch("src.config.SOUND_ENABLED", False),
+        ):
             sound_manager = SoundManager()
 
             # Should not raise any exception
@@ -125,7 +128,7 @@ class TestSoundManager:
             # When sound is disabled, sounds dict should not exist
             assert not hasattr(sound_manager, "sounds")
 
-    @patch("sounds.SOUND_ENABLED", True)
+    @patch("src.sounds.SOUND_ENABLED", True)
     @patch("pygame.mixer.init")
     @patch("pygame.mixer.set_num_channels")
     @patch("pygame.sndarray.make_sound")
@@ -341,7 +344,7 @@ class TestSoundManager:
         }
 
         with (
-            patch("sounds.SOUND_ENABLED", True),
+            patch("src.sounds.SOUND_ENABLED", True),
             patch("pygame.mixer.init"),
             patch("pygame.mixer.set_num_channels"),
             patch("pygame.sndarray.make_sound", return_value=MagicMock()),
@@ -351,10 +354,10 @@ class TestSoundManager:
             # Check all expected sounds are present
             assert set(sound_manager.sounds.keys()) == expected_sounds
 
-    @patch("sounds.sound_manager", MagicMock())
+    @patch("src.sounds.sound_manager", MagicMock())
     def test_module_level_sound_manager_exists(self):
         """Test that the module-level sound_manager is available."""
-        import sounds
+        from src import sounds
 
         # The sound_manager should exist
         assert hasattr(sounds, "sound_manager")

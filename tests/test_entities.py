@@ -10,8 +10,8 @@ import pytest
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import *
-from entities import (
+from src.config import *
+from src.entities import (
     Bonus,
     Bullet,
     Enemy,
@@ -20,7 +20,7 @@ from entities import (
     Player,
     TripleShotBullet,
 )
-from sprites import sprite_cache
+from src.sprites import sprite_cache
 
 
 class TestPlayer:

@@ -6,9 +6,9 @@ import random
 
 import pygame
 
-from config import *
-from entities import Bonus, EnemyGroup, Explosion, Player
-from sounds import sound_manager
+from .config import *
+from .entities import Bonus, EnemyGroup, Explosion, Player
+from .sounds import sound_manager
 
 
 class Game:
@@ -24,7 +24,7 @@ class Game:
 
         # Load and scale background image
         try:
-            self.background = pygame.image.load("background.png").convert()
+            self.background = pygame.image.load("assets/background.png").convert()
             self.background = pygame.transform.scale(
                 self.background, (SCREEN_WIDTH, SCREEN_HEIGHT)
             )

@@ -1,6 +1,6 @@
 """Main entry point for Neon Space Invaders game."""
 
-from game import Game
+from .game import Game
 
 
 def main():

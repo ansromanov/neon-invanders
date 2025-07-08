@@ -5,6 +5,10 @@
 - Write code optimized for performance
 - Use ruff for linting and code quality checks
 - Follow Python best practices and PEP 8
+- After making code changes, run the following quality checks:
+  1. `make format` - to automatically format code
+  2. `make lint` - to check for code style issues
+  3. `make type-check` - to verify type annotations
 
 ## Development Environment
 

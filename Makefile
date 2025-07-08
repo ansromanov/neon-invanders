@@ -2,7 +2,29 @@
 
 # Default target
 help:
-	@echo "Available targets:"
+	@echo "╔══════════════════════════════════════════════════════════════════╗"
+	@echo "║                 AWS Retro Game Challenge Makefile                ║"
+	@echo "╚══════════════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "📦 Dependencies:"
+	@echo "  make install      - Install project dependencies using uv"
+	@echo ""
+	@echo "🎮 Running:"
+	@echo "  make run          - Run the game"
+	@echo ""
+	@echo "🧪 Testing:"
+	@echo "  make test         - Run all tests"
+	@echo "  make test-cov     - Run tests with coverage report"
+	@echo ""
+	@echo "✨ Code Quality:"
+	@echo "  make format       - Format code using ruff"
+	@echo "  make lint         - Check code style with ruff"
+	@echo "  make type-check   - Run type checking with mypy"
+	@echo ""
+	@echo "🔧 Maintenance:"
+	@echo "  make clean        - Remove generated files and caches"
+	@echo "  make pre-commit   - Install and run pre-commit hooks"
+	@echo ""
 
 # Install project dependencies
 install:
@@ -48,7 +70,7 @@ clean:
 
 # Run the game
 run:
-	uv run main.py
+	uv run python -m src.main
 
 # Install pre-commit hooks
 pre-commit:
