@@ -351,24 +351,34 @@ class TestSettingsMenuDrawing:
         # Test drawing doesn't raise errors
         self.settings_menu.draw()
 
-    @patch("pygame.Surface.set_clip")
-    def test_draw_with_clipping(self, mock_set_clip):
+    def test_draw_with_clipping(self):
         """Test that clipping is properly set and removed."""
-        self.settings_menu.draw()
+        # Create a mock screen with set_clip method
+        mock_screen = MagicMock()
+        mock_screen.get_width.return_value = 800
+        mock_screen.get_height.return_value = 600
+
+        # Create settings menu with mock screen
+        settings_menu = SettingsMenu(mock_screen, self.game)
+
+        # Draw the menu
+        settings_menu.draw()
 
         # Should have called set_clip twice (once to set, once to remove with None)
-        assert mock_set_clip.call_count == 2
+        assert mock_screen.set_clip.call_count == 2
 
         # Get the arguments from the calls
-        calls = mock_set_clip.call_args_list
+        calls = mock_screen.set_clip.call_args_list
 
         # First call should set a clip rect
-        first_call_args = calls[0][0]
-        assert len(first_call_args) > 0  # Has arguments
+        first_call = calls[0]
+        # Check that a pygame.Rect was passed (not None)
+        assert first_call[0][0] is not None
+        assert hasattr(first_call[0][0], "x")  # It should be a Rect-like object
 
         # Second call should remove clipping by passing None
-        second_call_args = calls[1][0]
-        assert second_call_args[0] is None
+        second_call = calls[1]
+        assert second_call[0][0] is None
 
 
 class TestSettingsMenuIntegration:
@@ -384,7 +394,7 @@ class TestSettingsMenuIntegration:
         yield
         pygame.quit()
 
-    @patch("src.sounds.sound_manager")
+    @patch("src.settings_menu.sound_manager")
     def test_sound_and_music_interaction(self, mock_sound_manager):
         """Test interaction between sound and music settings."""
         # Enable both sound and music
@@ -400,7 +410,7 @@ class TestSettingsMenuIntegration:
         assert self.game.music_enabled is False
         mock_sound_manager.stop_music.assert_called()
 
-    @patch("src.sounds.sound_manager")
+    @patch("src.settings_menu.sound_manager")
     def test_volume_updates_all_sounds(self, mock_sound_manager):
         """Test volume change updates all sounds."""
         # Mock sounds dictionary

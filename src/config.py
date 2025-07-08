@@ -78,8 +78,8 @@ MUSIC_ENABLED = True  # Enable music by default
 
 # Visual effects settings
 STARS_ENABLED = True  # Enable starfield effect
-STAR_COUNT = 17  # Number of stars in starfield
-PARTICLE_COUNT = 7  # Number of particles in explosions
+STAR_COUNT = 10  # Number of stars in starfield (reduced for performance)
+PARTICLE_COUNT = 5  # Number of particles in explosions (reduced for performance)
 NEON_GRID_ENABLED = True  # Enable neon grid background
 PLAYER_TRAIL_ENABLED = True  # Enable player movement trail
-PLAYER_TRAIL_LENGTH = 15  # Length of player trail
+PLAYER_TRAIL_LENGTH = 8  # Length of player trail (reduced for performance)
