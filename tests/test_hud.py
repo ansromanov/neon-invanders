@@ -320,13 +320,13 @@ class TestMinimapHUD(unittest.TestCase):
 
         # Check enemy positions - just verify calculations work
         assert int(115 * scale_x) == int(115 * 0.15)  # enemy1 x
-        assert int(115 * scale_y) == int(115 * 0.133)  # enemy1 y
+        assert round(115 * scale_y) == round(115 * 80 / 600)  # enemy1 y
         assert int(615 * scale_x) == int(615 * 0.15)  # enemy2 x
-        assert int(315 * scale_y) == int(315 * 0.133)  # enemy2 y
+        assert round(315 * scale_y) == round(315 * 80 / 600)  # enemy2 y
 
         # Check player position - just verify calculations work
         assert int(415 * scale_x) == int(415 * 0.15)  # player x
-        assert int(515 * scale_y) == int(515 * 0.133)  # player y
+        assert round(515 * scale_y) == round(515 * 80 / 600)  # player y
 
         # Verify draw calls were made with correct positions
         calls = mock_circle.call_args_list

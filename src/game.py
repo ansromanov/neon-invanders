@@ -27,6 +27,7 @@ from .neon_effects import (
     StarField,
 )
 from .performance import OptimizedGroup, bullet_pool, explosion_pool
+from .settings_menu import SettingsMenu
 from .sounds import sound_manager
 
 
@@ -90,6 +91,10 @@ class Game:
         self.show_fps = False
         self.difficulty = "Normal"  # Easy, Normal, Hard
         self.particles_enabled = True  # Enable/disable particle effects
+
+        # Settings menu
+        self.settings_menu = SettingsMenu(self.screen, self)
+        self.selected_setting = 0  # Keep for backward compatibility
 
         # Visual effects
         self.starfield = StarField(STAR_COUNT) if STARS_ENABLED else None
@@ -188,12 +193,9 @@ class Game:
                 elif self.state == GameState.SETTINGS:
                     if event.key == pygame.K_ESCAPE:
                         self.state = GameState.MENU
-                    elif event.key == pygame.K_UP:
-                        self.selected_setting = max(0, self.selected_setting - 1)
-                    elif event.key == pygame.K_DOWN:
-                        self.selected_setting = min(5, self.selected_setting + 1)
-                    elif event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
-                        self.handle_setting_change(event.key)
+                    else:
+                        # Delegate navigation to settings menu
+                        self.settings_menu.handle_navigation(event.key)
 
     def player_shoot(self):
         """Handle player shooting."""
@@ -280,9 +282,8 @@ class Game:
                 # Play enemy shooting sound
                 sound_manager.play("enemy_shoot")
 
-    def update(self):
-        """Update game state."""
-        # Always update visual effects
+    def _update_visual_effects(self):
+        """Update visual effects like starfield, grid, and particles."""
         if self.starfield:
             self.starfield.update()
         if self.neon_grid:
@@ -301,9 +302,8 @@ class Game:
             if not sparkle.active:
                 self.sparkle_effects.remove(sparkle)
 
-        if self.state != GameState.PLAYING:
-            return
-
+    def _update_game_playing(self):
+        """Update game logic when in PLAYING state."""
         # Update player with keyboard input
         keys = pygame.key.get_pressed()
         if self.player:
@@ -331,37 +331,55 @@ class Game:
         self.check_collisions()
 
         # Check game over conditions
-        if self.player:
-            if not self.player.is_alive():
-                self.state = GameState.GAME_OVER
-                self.save_high_score()
-                # Play game over sound
-                sound_manager.play("game_over")
-                sound_manager.stop_music()  # Stop music on game over
-                # Clear player trail if enabled
-                if self.player_trail:
-                    self.player_trail.clear()
-            elif self.enemy_group.check_player_collision(self.player.rect):
-                self.player.lives = 0
-                self.state = GameState.GAME_OVER
-                self.save_high_score()
-                # Play game over sound
-                sound_manager.play("game_over")
-                sound_manager.stop_music()  # Stop music on game over
-                # Clear player trail if enabled
-                if self.player_trail:
-                    self.player_trail.clear()
-            elif self.enemy_group.is_empty():
-                self.state = GameState.WAVE_CLEAR
-                self.player.score += WAVE_CLEAR_BONUS
-                # Play wave clear sound
-                sound_manager.play("wave_clear")
-                # Add celebration sparkles only if particles enabled
-                if self.particles_enabled:
-                    for _ in range(5):
-                        x = random.randint(100, SCREEN_WIDTH - 100)
-                        y = random.randint(100, SCREEN_HEIGHT - 100)
-                        self.sparkle_effects.append(SparkleEffect((x, y)))
+        self._check_game_over_conditions()
+
+    def _check_game_over_conditions(self):
+        """Check for game over conditions."""
+        if not self.player:
+            return
+
+        if not self.player.is_alive():
+            self._handle_game_over()
+        elif self.enemy_group.check_player_collision(self.player.rect):
+            self.player.lives = 0
+            self._handle_game_over()
+        elif self.enemy_group.is_empty():
+            self._handle_wave_clear()
+
+    def _handle_game_over(self):
+        """Handle game over state transition."""
+        self.state = GameState.GAME_OVER
+        self.save_high_score()
+        sound_manager.play("game_over")
+        sound_manager.stop_music()
+        if self.player_trail:
+            self.player_trail.clear()
+
+    def _handle_wave_clear(self):
+        """Handle wave clear state transition."""
+        self.state = GameState.WAVE_CLEAR
+        self.player.score += WAVE_CLEAR_BONUS
+        sound_manager.play("wave_clear")
+
+        # Add celebration sparkles only if particles enabled
+        if self.particles_enabled:
+            for _ in range(5):
+                x = random.randint(100, SCREEN_WIDTH - 100)
+                y = random.randint(100, SCREEN_HEIGHT - 100)
+                self.sparkle_effects.append(SparkleEffect((x, y)))
+
+    def update(self):
+        """Update game state."""
+        # Always update visual effects
+        self._update_visual_effects()
+
+        # Update settings menu animations
+        if self.state == GameState.SETTINGS:
+            self.settings_menu.update()
+
+        # Update game logic only when playing
+        if self.state == GameState.PLAYING:
+            self._update_game_playing()
 
     def check_collisions(self):
         """Check all game collisions."""
@@ -825,69 +843,8 @@ class Game:
         if self.neon_grid:
             self.neon_grid.draw(self.screen)
 
-        # Title with glow
-        NeonText.draw_glowing_text(
-            self.screen,
-            "SETTINGS",
-            self.big_font,
-            (SCREEN_WIDTH // 2, 100),
-            NEON_GREEN,
-            glow_intensity=3,
-        )
-
-        # Settings options
-        settings = [
-            ("Sound", "ON" if self.sound_enabled else "OFF"),
-            ("Music", "ON" if self.music_enabled else "OFF"),
-            ("Volume", f"{int(self.sound_volume * 100)}%"),
-            ("Show FPS", "ON" if self.show_fps else "OFF"),
-            ("Particles", "ON" if self.particles_enabled else "OFF"),
-            ("Difficulty", self.difficulty),
-        ]
-
-        y_start = 200
-        for i, (name, value) in enumerate(settings):
-            # Highlight selected setting
-            color = NEON_YELLOW if i == self.selected_setting else NEON_CYAN
-
-            # Draw setting name
-            name_text = self.font.render(name + ":", True, color)
-            name_rect = name_text.get_rect(
-                midright=(SCREEN_WIDTH // 2 - 20, y_start + i * 60)
-            )
-            self.screen.blit(name_text, name_rect)
-
-            # Draw setting value
-            value_text = self.font.render(value, True, color)
-            value_rect = value_text.get_rect(
-                midleft=(SCREEN_WIDTH // 2 + 20, y_start + i * 60)
-            )
-            self.screen.blit(value_text, value_rect)
-
-            # Draw arrows for selected setting
-            if i == self.selected_setting:
-                left_arrow = self.font.render("<", True, NEON_PINK)
-                left_rect = left_arrow.get_rect(
-                    midright=(value_rect.left - 10, y_start + i * 60)
-                )
-                self.screen.blit(left_arrow, left_rect)
-
-                right_arrow = self.font.render(">", True, NEON_PINK)
-                right_rect = right_arrow.get_rect(
-                    midleft=(value_rect.right + 10, y_start + i * 60)
-                )
-                self.screen.blit(right_arrow, right_rect)
-
-        # Instructions
-        instructions = self.font.render(
-            "Use UP/DOWN to select, LEFT/RIGHT to change", True, NEON_PURPLE
-        )
-        instructions_rect = instructions.get_rect(center=(SCREEN_WIDTH // 2, 500))
-        self.screen.blit(instructions, instructions_rect)
-
-        back_text = self.font.render("Press ESC to return to menu", True, NEON_PINK)
-        back_rect = back_text.get_rect(center=(SCREEN_WIDTH // 2, 550))
-        self.screen.blit(back_text, back_rect)
+        # Delegate drawing to the enhanced settings menu
+        self.settings_menu.draw()
 
     def draw(self):
         """Draw appropriate screen based on game state."""
